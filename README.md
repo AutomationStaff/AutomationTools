@@ -1,11 +1,9 @@
 # AutomationTools
-AutomationTools Blender add-on.
-
-Automation Modeling, Rigging and Skinning Pipeline Tools.
+Blender add-on for modeling, rigging, skinning and game export pipelines.
 
 Requires Blender version 2.92.0 and higher.
 
-To install, download the zip file and go to Blender -> Preferences -> Add-ons -> Install and make sure that the add-on is active.
+To install, download the zip file and go to Blender -> Preferences -> Add-ons -> Install. Also make sure that the add-on is active.
  AutomationTools will appear on the Sidebar. Uninstall previous version of AT - AutomationTools.py if it was installed earlier.
 
 
