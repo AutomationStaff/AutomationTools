@@ -1,7 +1,7 @@
 # AutomationTools
 AutomationTools Blender add-on.
 
-Automation Modeling, Rigging and Skinning Tools.
+Automation Modeling, Rigging and Skinning Pipeline Tools.
 
 Requires Blender version 2.92.0 and higher.
 
