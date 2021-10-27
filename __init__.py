@@ -31,7 +31,7 @@ bl_info = {
 	"blender": (2, 92, 0),
 	"location": "Sidebar -> Automation Tools",
 	"url": "https://github.com/AutomationStaff/AutomationTools",
-    "wiki_url": "https://github.com/AutomationStaff/AutomationTools/wiki/Automation-Tools-wiki",
+    "wiki_url": "https://github.com/AutomationStaff/AutomationTools/wiki",
 	"category": "3D View"
 }
  
