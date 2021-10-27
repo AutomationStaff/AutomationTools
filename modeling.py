@@ -1204,13 +1204,14 @@ class CurveBetween2Objects (Operator):
 		
 	def execute(self, context):
 		#update selection
-		if bpy.context.mode == 'OBJECT':			
-			bpy.ops.object.mode_set(mode = 'EDIT')
-			bpy.ops.object.mode_set(mode = 'OBJECT')
+		if bpy.context.object.type != "EMPTY":
+			if bpy.context.mode == 'OBJECT':			
+				bpy.ops.object.mode_set(mode = 'EDIT')
+				bpy.ops.object.mode_set(mode = 'OBJECT')
 
-		elif bpy.context.mode == 'EDIT_MESH':
-			bpy.ops.object.mode_set(mode = 'OBJECT')
-			bpy.ops.object.mode_set(mode = 'EDIT')
+			elif bpy.context.mode == 'EDIT_MESH':
+				bpy.ops.object.mode_set(mode = 'OBJECT')
+				bpy.ops.object.mode_set(mode = 'EDIT')
 
 		if self.getEmptyPositions() is not None:
 			# if edit mode
