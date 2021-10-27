@@ -9,7 +9,7 @@ from . rigging_skinning import _class_method_mesh_
 class CopyApplyModifier (Operator):
 	bl_idname = "view3d.copy_apply_modifier"
 	bl_label = "Duplicate Apply Shrinkwrap"
-	bl_description = "Automatically duplicates and applies modifiers"
+	bl_description = "Duplicate and apply modifiers"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	only_active : bpy.props.BoolProperty(name="Active only", default=True)
@@ -231,7 +231,7 @@ class TransferModifiers(Operator):
 class AddBevelWidthDriver(Operator):
 	bl_idname = "object.add_bevel_width_driver"
 	bl_label = "Add Bevel Width Driver"
-	bl_description = "Adds bevel width driver for Rim scale shape keys"
+	bl_description = "Add bevel width driver for Rim scale shape keys"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	# bpy.context.object.animation_data.drivers[0].driver.expression = 'var * (3 - 1) + 3'
@@ -289,8 +289,8 @@ class AddBevelWidthDriver(Operator):
 
 class BevelWidthLerpInputBar(Operator):
 	bl_idname = "object.bevel_width_input_bar"
-	bl_label = "Bevel Width Driver Value"
-	bl_description = "Bevel Width Driver Value"
+	bl_label = "Bevel Width Driver"
+	bl_description = "Bevel Width Driver"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	@classmethod
@@ -1041,7 +1041,7 @@ class AddEmptyShapeKeys(Operator):
 	bl_label = 'Add Empty Rim Shape Keys'
 	bl_idname = 'object.add_empty_shape_keys'
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = "Adds empty Body/Rim shape keys. Body shape key generator takes an active vertex group's name to name a new key. Rim gets 3 empty keys: Base, Scale, Offset" 
+	bl_description = "Add empty Body/Rim shape keys. Body shape key generator takes an active vertex group's name to name a new key. Rim gets 3 empty keys: Base, Scale, Offset" 
 	type: bpy.props.StringProperty(options = {'HIDDEN'})
 	@classmethod
 	def poll(cls, context):
@@ -1069,7 +1069,7 @@ class AddEmptyShapeKeys(Operator):
 class ToggleCarPaint(Operator):
 	bl_label = "Check Reflections"
 	bl_idname = "view3d.toggle_carpaint"
-	bl_description = "Toggles between Car Paint and Basic Viewport Shading. Requires Active Mesh selection"
+	bl_description = "Toggle between Car Paint and Basic Viewport Shading. Requires Active Mesh selection"
 	
 	@classmethod
 	def poll(cls, context):

@@ -6,7 +6,7 @@ from bpy.types import Operator
 class DrawBrushBlendToggle(Operator):
 	bl_label = "Set Weight Paint Brush"
 	bl_idname = "brush.draw_brush_blend_toggle"
-	bl_description = "Select Blend Type"
+	bl_description = "Toggle between Draw Brush Add and Sub blend types"
 	bl_options = {'REGISTER', 'UNDO'}
 	mode : bpy.props.StringProperty(name="Mode", options = {'HIDDEN'})
 
@@ -130,8 +130,8 @@ class AddArmatureMod (Operator):
 
 class ScaleAllBones (Operator):
 	bl_idname = "object.scale_all_bones"
-	bl_label = "Apply Scale"
-	bl_description = "Apply Scale"
+	bl_label = "Apply Bone Scale"
+	bl_description = "Apply Bone Scale"
 	bl_options = {'REGISTER', 'UNDO'}	
 	
 	@classmethod
@@ -218,7 +218,7 @@ class SyncVG (Operator):
 
 class SelectBonesAndMode(Operator):
 	bl_idname = "armature.select_bones_and_mode"
-	bl_label = "Select Next Bone"
+	bl_label = "Select Bone"
 	bl_description = "Fast Bone Selection in Edit/Pose/Weight Paint modes."
 	bl_options = {'REGISTER', 'UNDO'}
 	name: bpy.props.StringProperty(options = {'HIDDEN'})
@@ -580,7 +580,7 @@ class ClampNearZeroValues(Operator):
 class DrawBrushTemplateSettings(Operator):
 	bl_label = "Set Predefined Settings"
 	bl_idname = "brush.draw_brush_template_settings"
-	bl_description = "Set Predefined Settings. Auto Normalize = 'True', Falloff = 'Constant', Falloff Shape = 'PROJECTED', Lock Relative = 'True', Restrict = 'True'"
+	bl_description = "Use preset settings. Auto Normalize = 'True', Falloff = 'Constant', Falloff Shape = 'PROJECTED', Lock Relative = 'True', Restrict = 'True'"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	def execute(self, context):

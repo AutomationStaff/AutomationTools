@@ -8,7 +8,7 @@ import os
 class BodyExport(Operator):
 	bl_idname = "object.body_export"
 	bl_label = "Body Export"
-	bl_description = "Exports the Car Body with its Boundboxes located inside their own collection named as a future fbx file. Select the body collection in Outliner ant press [Export Single]. Armature should be in the root Scene Collection only"
+	bl_description = "Export the Car Body with its Boundboxes located inside their own collection named as a future fbx file. Select the body collection in Outliner ant press [Export Single]. Armature should be in the root Scene Collection only"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	@classmethod
@@ -224,7 +224,7 @@ class BodyExport(Operator):
 class BodiesBatchExport(Operator):
 	bl_idname = "object.bodies_batch_export"
 	bl_label = "Bodies Batch Export"
-	bl_description = "Exports Car Bodies in batch mode. Requires a special parent collection containing at least one body collection and exports all not excluded from View Layer"
+	bl_description = "Export Car Bodies in batch mode. Requires a special parent collection containing at least one body collection and exports all not excluded from View Layer"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	@classmethod
@@ -443,7 +443,7 @@ class GetSelectedObjectsNames (Operator):
 class FixturesExport(Operator):   
 	bl_idname = "object.fixture_export"
 	bl_label = "Fixtures Export"
-	bl_description = "Non-Destructive Fixtures Export. Select a parent Fixtures Collection and press Export Single"
+	bl_description = "Non-destructive Fixtures Export. Select a parent Fixtures Collection and press Export Single"
 	
 	@classmethod
 	def poll(cls, context):
@@ -592,7 +592,7 @@ class FixturesExport(Operator):
 class FixturesBatchExport(Operator):
 	bl_idname = "object.fixtures_batch_export"
 	bl_label = "Fixtures Batch Export"
-	bl_description = "Non-Destructive Fixtures Batch Export. Select a master Fixtures Collection and press Export Batch."
+	bl_description = "Non-destructive Fixtures Batch Export. Select a master Fixtures Collection and press Export Batch."
 	bl_options = {'REGISTER', 'UNDO'}
 
 	@classmethod
@@ -607,7 +607,7 @@ class HierarchyExport(Operator):
 	bl_idname = "object.fast_auto_fbx_export"
 	bl_label = "Fast Auto Fbx Export"
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = 'Export fixtures/engine parts/other assets with hierarchy.'
+	bl_description = 'Export Fixtures/Engine Parts or other assets with hierarchy. Top Parent is always an Empty.'
 	
 	@classmethod
 	def poll(cls, context):
