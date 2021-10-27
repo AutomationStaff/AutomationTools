@@ -624,7 +624,7 @@ class HierarchyExport(Operator):
 					bpy.ops.object.mode_set(mode = 'OBJECT')
 
 			bpy.ops.object.select_all(action='DESELECT')
-			if path.exists(bpy.context.scene.hierarchy_path):
+			if os.path.exists(bpy.context.scene.hierarchy_path):
 				obj_list = list(bpy.context.scene.hierarchy_list.split(" "))
 				if obj_list:
 					for i in obj_list:
