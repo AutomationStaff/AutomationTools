@@ -5,6 +5,80 @@ from bpy.types import Operator
 from pathlib import Path
 import os
 
+class StandardBatchExport(Operator):
+   
+	bl_idname = "object.standard_batch_export"
+	bl_label = "Standard Batch Export"
+	bl_description = "Standard Automation Batch Exporter. Requires object selection. Exports Mesh, Armature, Empty object types. Fbx files get their names from the meshes"
+	
+	@classmethod
+	def poll(cls, context):
+		return context.mode == "OBJECT" and context.object is not None
+
+	# main export function
+	def exp(self, obj_name, file_path):		
+		bpy.ops.export_scene.fbx(filepath=(file_path + "/" + obj_name + ".fbx"), check_existing=False, use_selection=True, object_types={'EMPTY','ARMATURE','MESH'}, bake_anim=False, axis_forward='Y', axis_up='Z', add_leaf_bones=False, use_custom_props=True)
+
+	def execute(self, context):
+		file_path = bpy.context.scene.standard_batch_export_path
+		# if directory exists
+		if  os.path.exists(file_path):
+			o = bpy.ops.object
+			ao = bpy.context.active_object
+			d = bpy.data
+			c = bpy.context
+			sel = bpy.context.selected_objects
+			sel_return = bpy.context.selected_objects
+			
+			sel = bpy.context.selected_objects	
+			if sel:
+				if c.object.type == "MESH" and c.active_object.mode == 'OBJECT':				 
+					sel = bpy.context.selected_objects
+					o.select_all(action='DESELECT')
+					
+					for i in sel:
+						i.select_set(True)
+						bpy.context.view_layer.objects.active = i
+
+						if i.type == "MESH":
+							i.select_set(True)				
+							# sockets
+							if i.children:            
+								bpy.ops.object.select_grouped(type='CHILDREN')
+								ch = bpy.context.selected_objects
+								for n in ch:
+									if bpy.context.object.type == 'EMPTY':
+										n.select_set(True)
+								d.objects[i.name].select_set(True)
+								bpy.context.view_layer.objects.active = d.objects[i.name]
+							# armature
+							obj_armature = get_armature(self, i)
+							if obj_armature is not None:							 
+								d.objects[obj_armature.name].select_set(True)
+					
+						# file full name
+						file = file_path + i.name + ".fbx"
+					
+						# check file writing permissions						
+						if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
+							# export
+							self.exp(i.name, file_path)
+							self.report({'INFO'},  file_path + i.name + ".fbx")
+							o.select_all(action='DESELECT')
+						else:
+							self.report({'WARNING'}, "Nothing exported. Check file's writing permissions")
+				
+					# Back to original selection
+					o.select_all(action='DESELECT')
+					for i in sel_return:
+							i.select_set(True)
+					bpy.context.view_layer.objects.active = ao		
+			else:
+				self.report({'WARNING'}, "Nothing selected")					 
+		else:
+			self.report({'WARNING'}, 'The directory is not valid! Try selecting it again with Relative Path unchecked in the Blender file dialog settings.')	
+		return {'FINISHED'}
+
 class BodyExport(Operator):
 	bl_idname = "object.body_export"
 	bl_label = "Body Export"
@@ -1160,6 +1234,7 @@ def batch_export(cls, context, export_type):
 		cls.report({'WARNING'}, 'Parent Collection not found!')
 
 classes = (
+	StandardBatchExport,
 	BodyExport,
 	BodiesBatchExport,
 	RimExport,
@@ -1222,6 +1297,13 @@ def register():
 		subtype='FILE_PATH',
 		description = 'File Path'
 	)
+
+	bpy.types.Scene.standard_batch_export_path = bpy.props.StringProperty(
+		name="",
+		subtype='FILE_PATH',
+		description = 'File Path'
+	)
+
 	bpy.types.Scene.if_lods = bpy.props.BoolProperty(
 		name="LODs",
 		description = 'Export as LODs',
@@ -1239,6 +1321,7 @@ def unregister():
 	for cls in reversed(classes):
 		bpy.utils.unregister_class(cls)
 
+	bpy.types.Scene.standard_batch_export_path
 	bpy.types.Scene.body_export_path
 	bpy.types.Scene.if_apply_modifiers
 	bpy.types.Scene.hierarchy_list

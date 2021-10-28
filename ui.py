@@ -485,7 +485,6 @@ class CurvesPanel(Panel):
 		column.operator("object.curve_between_2_objects", text = "Vertices / Objects > Curve")		
 		column.operator("object.edge_to_curve", text = "Edges > Curve")
 
-
 class TriangulationPanel(Panel):
 	bl_label = "Triangulation"
 	bl_idname = "OBJECT_PT_AUT_RIG_SK_TRIANGULATION_PANEL"
@@ -519,6 +518,22 @@ class ModifiersPanel(Panel):
 		column.operator("object.transfer_modifiers", text = "Transfer")
 		column.operator("view3d.copy_apply_modifier", text = "Copy and Apply")
 		column.operator("object.apply_modifiers_with_shape_keys", text = 'Apply [with Shape Keys]')
+
+class StandardBatchExportPanel(Panel):
+	bl_label = "Batch Export"
+	bl_idname = "OBJECT_PT_Standard_Batch_Export_Panel"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = ExportPanel.bl_idname	
+	
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column(align=True)
+
+		column.prop(bpy.context.scene, "standard_batch_export_path")
+		column.operator("object.standard_batch_export", text = "Export")
 
 class BodyExportPanel(Panel):
 	bl_label = "Body"
@@ -1078,6 +1093,7 @@ classes = (
 	RimExportPanel,
 	HierarchyExportPanel,
 	FixturesExportPanel,
+	StandardBatchExportPanel,
 	OptionsPanel,
 	GenerateRigMenu,
 	FenderSubMenu,
