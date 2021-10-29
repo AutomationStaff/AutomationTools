@@ -30,6 +30,8 @@ class ExportPanel(Panel):
 	
 	def draw(self, context):
 		layout = self.layout
+		column = layout.column()
+		column.prop(bpy.context.scene, "export_path")
 
 class GeneratorsPanel(Panel):
 	bl_label = "Generators"
@@ -532,7 +534,6 @@ class StandardBatchExportPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
-		column.prop(bpy.context.scene, "standard_batch_export_path")
 		column.operator("object.standard_batch_export", text = "Export")
 
 class BodyExportPanel(Panel):
@@ -548,9 +549,8 @@ class BodyExportPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
-		column.prop(bpy.context.scene, "body_export_path")
-		column.operator(BodyExport.bl_idname, text = "Export Single")
-		column.operator(BodiesBatchExport.bl_idname, text = "Export Batch")
+		column.operator(BodyExport.bl_idname, text = "One Collection")
+		column.operator(BodiesBatchExport.bl_idname, text = "All Collections")
 		column.prop(bpy.context.scene, "if_apply_modifiers")
 		column.prop(bpy.context.scene, "debug_mode")
 
@@ -568,9 +568,8 @@ class RimExportPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
-		column.prop(bpy.context.scene, "rim_export_path")
-		column.operator("object.rim_export", text = "Export Single")
-		column.operator("object.rim_batch_export", text = "Export Batch")
+		column.operator("object.rim_export", text = "One Collection")
+		column.operator("object.rim_batch_export", text = "All Collections")
 		column.prop(bpy.context.scene, "debug_mode")
 
 class HierarchyExportPanel(Panel):
@@ -588,8 +587,7 @@ class HierarchyExportPanel(Panel):
 
 		split = column.split(factor=0.75, align=True)
 		split.prop(bpy.context.scene, "hierarchy_list")
-		split.operator("object.get_selected_objects_names", text = "Add")		
-		column.prop(bpy.context.scene, "hierarchy_path")
+		split.operator("object.get_selected_objects_names", text = "Add")
 		column.operator("object.fast_auto_fbx_export", text = "Export")
 		column.prop(bpy.context.scene, "if_lods")
 
@@ -606,9 +604,9 @@ class FixturesExportPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
-		column.prop(bpy.context.scene, "fixtures_path")
-		column.operator("object.fixture_export", text = "Export Single")
-		column.operator("object.fixtures_batch_export", text = "Export Batch")
+		column.operator("object.standard_batch_export", text = "Selected Objects")
+		column.operator("object.fixture_export", text = "One Collection")
+		column.operator("object.fixtures_batch_export", text = "All Collections")		
 
 class OptionsPanel(Panel):
 	bl_label = "Options"
@@ -623,8 +621,7 @@ class OptionsPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
-		column.label(text = 'Vertex Groups:')
-		# split = column.split(factor=0.5, align=True)		
+		column.label(text = 'Vertex Groups:')		
 		column.prop(bpy.context.scene, 'select_all_vg_vertices')
 		column.prop(bpy.context.scene, 'lock_all_unused_vgs')
 		column.prop(bpy.context.scene, 'auto_add_vertex_group')

@@ -13,14 +13,17 @@ class StandardBatchExport(Operator):
 	
 	@classmethod
 	def poll(cls, context):
-		return context.mode == "OBJECT" and context.object is not None
+		return context.object is not None
 
 	# main export function
 	def exp(self, obj_name, file_path):		
 		bpy.ops.export_scene.fbx(filepath=(file_path + "/" + obj_name + ".fbx"), check_existing=False, use_selection=True, object_types={'EMPTY','ARMATURE','MESH'}, bake_anim=False, axis_forward='Y', axis_up='Z', add_leaf_bones=False, use_custom_props=True)
 
 	def execute(self, context):
-		file_path = bpy.context.scene.standard_batch_export_path
+		file_path = bpy.context.scene.export_path
+
+		forced_object_mode(self, context, context.object)
+
 		# if directory exists
 		if  os.path.exists(file_path):
 			o = bpy.ops.object
@@ -145,10 +148,11 @@ class BodyExport(Operator):
 		return state
 
 	def execute(self, context):
-		file_path = bpy.context.scene.body_export_path
+		file_path = bpy.context.scene.export_path
 		ops = bpy.ops.object
 		obj = bpy.context.object
-
+		
+		forced_object_mode(self, context, context.object)
 		# if directory exists
 		if  os.path.exists(file_path):		
 			collection = bpy.context.collection
@@ -363,9 +367,11 @@ class RimExport(Operator):
 				return None
 
 	def execute(self, context):		
-		file_path = bpy.context.scene.rim_export_path
+		file_path = bpy.context.scene.export_path		
+		forced_object_mode(self, context, context.object)		
 		ops = bpy.ops.object
 		data = bpy.data.objects		
+		
 		# if directory exists
 		if  os.path.exists(file_path):		
 			collection = bpy.context.collection
@@ -557,9 +563,11 @@ class FixturesExport(Operator):
 		)
 
 	def execute(self, context):
-		file_path = bpy.context.scene.fixtures_path
+		file_path = bpy.context.scene.export_path
 		ops = bpy.ops.object
 		data = bpy.data.objects
+
+		forced_object_mode(self, context, context.object)
 		
 		# if directory exists
 		if  os.path.exists(file_path):
@@ -574,15 +582,14 @@ class FixturesExport(Operator):
 
 							full_name = file_path + collection_name + '.fbx'
 							if bpy.context.selected_objects:
-								bpy.ops.object.select_all(action='DESELECT')
+								bpy.ops.object.select_all(action='DESELECT') 
 							if collection.name != 'Master Collection':				
 								#get collection's mesh content
 								content = [i for i in collection.all_objects[:] if i.type == 'MESH']				
 								fixture_copies = []
 				
 								if content:
-									bpy.ops.object.select_all(action='DESELECT')
-						
+									bpy.ops.object.select_all(action='DESELECT')						
 									# start applying modifiers						
 									for fixture in content:
 										# copy
@@ -685,20 +692,15 @@ class HierarchyExport(Operator):
 	
 	@classmethod
 	def poll(cls, context):
-		return context.mode == "OBJECT" and context.object is not None
+		return context.object is not None
 
 	def execute(self, context):
-		hier_path = bpy.context.scene.hierarchy_path
-
+		hier_path = bpy.context.scene.export_path
+		forced_object_mode(self, context, context.object)
 		# if directory exists
 		if os.path.exists(hier_path):
-			# object mode
-			if bpy.context.mode != 'OBJECT':
-				if bpy.context.object:
-					bpy.ops.object.mode_set(mode = 'OBJECT')
-
 			bpy.ops.object.select_all(action='DESELECT')
-			if os.path.exists(bpy.context.scene.hierarchy_path):
+			if os.path.exists(hier_path):
 				obj_list = list(bpy.context.scene.hierarchy_list.split(" "))
 				if obj_list:
 					for i in obj_list:
@@ -738,7 +740,7 @@ class NonDestructiveExport(Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return context.mode == "OBJECT" and context.object is not None
+		return context.object is not None
 
 	if_batch: bpy.props.BoolProperty()
 	file_path: bpy.props.StringProperty()
@@ -963,6 +965,7 @@ class NonDestructiveExport(Operator):
 		sel_return = bpy.context.selected_objects
 		name : bpy.props.StringProperty()				
 
+		forced_object_mode(self, context, context.object)
 		######################################
 		## EXPORT FILES/LODS WITH HIERARCHY		
 
@@ -994,7 +997,6 @@ class NonDestructiveExport(Operator):
 								file = self.file_path + p.name + ".fbx"
 								# check file's writing permissions
 								if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
-
 									#if flipped meshes
 									dupl_meshes = self.duplicateMeshesWithNegativeScale()
 									if dupl_meshes:
@@ -1146,10 +1148,8 @@ class NonDestructiveExport(Operator):
 				
 				else:
 					self.report({'WARNING'}, "Nothing selected")
-
 		else:
 			self.report({'WARNING'}, "Nothing exported")
-
 			for i in sel:
 				i.select_set(True)			 
 		
@@ -1232,6 +1232,11 @@ def batch_export(cls, context, export_type):
 			cls.report({'WARNING'}, 'Parent Collection cannot not be the Scene Collection!')
 	else:
 		cls.report({'WARNING'}, 'Parent Collection not found!')
+def forced_object_mode(cls, context, obj):
+	if context.mode != 'OBJECT':
+		noedit_types = ['EMPTY','VOLUME','LIGHT','LIGHT_PROBE','CAMERA','SPEAKER']
+		if obj.type not in noedit_types:
+			bpy.ops.object.mode_set(mode = 'OBJECT')
 
 classes = (
 	StandardBatchExport,
@@ -1251,22 +1256,10 @@ def register():
 	for cls in classes:
 		bpy.utils.register_class(cls)
 
-	bpy.types.Scene.body_list = bpy.props.StringProperty(
-		name='',
-		default='',
-		description = 'Select one or more objects with hierarchy.'
-		)
-
-	bpy.types.Scene.body_export_path = bpy.props.StringProperty(
+	bpy.types.Scene.export_path = bpy.props.StringProperty(
 		name="",
 		subtype='FILE_PATH',
 		description = 'Body Export File Path'
-	)
-
-	bpy.types.Scene.rim_export_path = bpy.props.StringProperty(
-		name="",
-		subtype='FILE_PATH',
-		description = 'Rim Export File Path'
 	)
 	
 	bpy.types.Scene.export_flag = bpy.props.BoolProperty(
@@ -1286,24 +1279,6 @@ def register():
 		description = 'Select one or more objects with hierarchy.'
 		)
 
-	bpy.types.Scene.hierarchy_path = bpy.props.StringProperty(
-		name='', 
-		subtype='FILE_PATH',
-		description = 'File Path'
-		)
-
-	bpy.types.Scene.fixtures_path = bpy.props.StringProperty(
-		name="",
-		subtype='FILE_PATH',
-		description = 'File Path'
-	)
-
-	bpy.types.Scene.standard_batch_export_path = bpy.props.StringProperty(
-		name="",
-		subtype='FILE_PATH',
-		description = 'File Path'
-	)
-
 	bpy.types.Scene.if_lods = bpy.props.BoolProperty(
 		name="LODs",
 		description = 'Export as LODs',
@@ -1321,11 +1296,7 @@ def unregister():
 	for cls in reversed(classes):
 		bpy.utils.unregister_class(cls)
 
-	bpy.types.Scene.standard_batch_export_path
-	bpy.types.Scene.body_export_path
+	bpy.types.Scene.export_path
 	bpy.types.Scene.if_apply_modifiers
 	bpy.types.Scene.hierarchy_list
-	bpy.types.Scene.hierarchy_path
-	bpy.types.Scene.fixtures_path
-	bpy.types.Scene.rim_export_path
 	bpy.types.Scene.debug_mode
