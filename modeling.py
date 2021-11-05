@@ -191,7 +191,7 @@ class ToggleAllModifiersVisibility(Operator):
 					if mod:
 						self.hideAllModifiers(mod)
 			bpy.context.scene.modifiersVisibilityStateAll = False
-			bpy.context.space_data.overlay.show_overlays = True
+			#bpy.context.space_data.overlay.show_overlays = True
 		else:
 			if sel:			
 				for obj in sel:
@@ -848,7 +848,7 @@ class ClearMatSlots(Operator):
 
 		return {'FINISHED'}
 
-class SortMeshMaterials(bpy.types.Operator):
+class SortMeshMaterials(Operator):
 	
 	bl_label = "Sort Materials"
 	bl_idname = "object.sort_mesh_materials"
@@ -1329,6 +1329,95 @@ class EdgeToCurve (Operator):
 
 		return {'FINISHED'}
 
+class VertexColorReplace (Operator):
+	bl_idname = "object.replace_vertex_color"
+	bl_label = "Replace Vertex Color"
+	bl_description = "Replace Vertex Color"
+	bl_options = {'REGISTER', 'UNDO'}
+	color_new: bpy.props.StringProperty(options = {'HIDDEN'})
+	
+	@classmethod
+	def poll(cls, context):
+		return bpy.context.active_object
+	
+	def replace_vertex_color(self, context):
+		sel = bpy.context.selected_objects
+		if len(sel) > 0:
+			for o in sel:
+				bpy.context.view_layer.objects.active = o
+				obj = o.data
+				bpy.ops.object.mode_set(mode = 'VERTEX_PAINT')
+
+				if_selected = bpy.context.scene.vertex_paint_only_selected
+				if_replace = bpy.context.scene.replace_vertex_paint_value
+				if_clamp = bpy.context.scene.clamp_vertex_paint_value
+				fill_polygon = bpy.context.scene.fill_vertex_paint
+				alpha_value = bpy.context.scene.vertex_color_alpha_value
+
+				replaceR = bpy.context.scene.color_to_replace_R
+				replaceG = bpy.context.scene.color_to_replace_G
+				replaceB = bpy.context.scene.color_to_replace_B
+				replaceA = bpy.context.scene.color_to_replace_A
+
+				replace_with = None
+				if self.color_new == "Red":
+					replace_with = (1.0, 0.0, 0.0, 1.0)
+				elif self.color_new == "Green":
+					replace_with = (0.0, 1.0, 0.0, 1.0)
+				elif self.color_new == "Blue":
+					replace_with = (0.0, 0.0, 1.0, 1.0)
+				elif self.color_new == "A":
+					replace_with = (0.0, 0.0, 0.0, alpha_value)
+				elif self.color_new == "Erase":
+					replace_with = (1.0, 1.0, 1.0, 1.0)
+
+				to_replace = None
+				if replaceR:
+					to_replace = (1.0, 0.0, 0.0)
+				elif replaceG:
+					to_replace = (0.0, 1.0, 0.0)
+				elif replaceB:
+					to_replace = (0.0, 0.0, 1.0)
+				elif replaceA:
+					to_replace = (0.0, 0.0, 0.0)
+		
+				if if_selected:
+					verts = [v for v in obj.vertices if v.select]
+				else:
+					verts = [v for v in obj.vertices]
+				
+				if if_replace:
+					for polygon in obj.polygons:
+						for v in verts:
+							for i, index in enumerate(polygon.vertices):
+								if v.index == index:
+									loop_index = polygon.loop_indices[i]							
+									if if_clamp:
+										for s in range(4):
+											obj.vertex_colors.active.data[loop_index].color[s] = round(obj.vertex_colors.active.data[loop_index].color[s], 0)
+									if obj.vertex_colors.active.data[loop_index].color[:3] == to_replace:
+										obj.vertex_colors.active.data[loop_index].color = replace_with
+				else:
+					for polygon in obj.polygons:
+						for v in verts:
+							for i, index in enumerate(polygon.vertices):
+								if v.index == index:
+									loop_index = polygon.loop_indices[i]
+									if self.color_new != "A":
+										obj.vertex_colors.active.data[loop_index].color = replace_with
+									else:
+										obj.vertex_colors.active.data[loop_index].color[3] = alpha_value
+				if fill_polygon:
+					obj.use_paint_mask = True
+					bpy.data.brushes['Draw'].color = replace_with[:3]
+					bpy.ops.paint.vertex_color_set()
+
+				bpy.ops.object.mode_set(mode = 'EDIT')	
+
+	def execute(self, context):	
+		self.replace_vertex_color(context)
+		return {'FINISHED'}
+
 
 classes = (
 	CopyApplyModifier,
@@ -1356,7 +1445,8 @@ classes = (
 	ToggleZeroOneValuesVertexWeight,
 	AddEmptyShapeKeys,
 	ToggleCarPaint,
-	GenerateHierarchy
+	GenerateHierarchy,
+	VertexColorReplace
 )
 
 # Functions
@@ -1434,6 +1524,16 @@ addon_keymaps = []
 def register():
 	for cls in classes:
 		bpy.utils.register_class(cls)
+
+	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Activate Replace Mode. It rewrites selected colour on meshes. Click on the checkbox (R, G, B, A) colour you want to replace and press the new colour button above')
+	bpy.types.Scene.clamp_vertex_paint_value = bpy.props.BoolProperty(description = 'Clamp float values 0 to 1')
+	bpy.types.Scene.vertex_paint_only_selected = bpy.props.BoolProperty(description = 'Replace only selected vertices')
+	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty()
+	bpy.types.Scene.color_to_replace_R = bpy.props.BoolProperty(name = 'R')
+	bpy.types.Scene.color_to_replace_G = bpy.props.BoolProperty(name = 'G')
+	bpy.types.Scene.color_to_replace_B = bpy.props.BoolProperty(name = 'B')
+	bpy.types.Scene.color_to_replace_A = bpy.props.BoolProperty(name = 'A')
+	bpy.types.Scene.vertex_color_alpha_value = bpy.props.FloatProperty(name = '', soft_min = 0, soft_max = 1, description = 'Vertex color alpha value')
 
 	bpy.types.Scene.modifiersVisibilityStateAll = bpy.props.BoolProperty()
 	
@@ -1530,12 +1630,23 @@ def register():
 	name="",
 	description="",
 	items=[('Bezier', 'Bezier', ''), ('Line', 'Line', '')]
+
 	)
 
 # Unregister
 def unregister():
 	for cls in reversed(classes):
 		bpy.utils.unregister_class(cls)
+	
+	bpy.types.Scene.vertex_color_alpha_value
+	bpy.types.Scene.fill_vertex_paint
+	bpy.types.Scene.replace_vertex_paint_value
+	bpy.types.Scene.clamp_vertex_paint_value	
+	bpy.types.Scene.vertex_paint_only_selected
+	bpy.types.Scene.color_to_replace_R
+	bpy.types.Scene.color_to_replace_G
+	bpy.types.Scene.color_to_replace_B
+	bpy.types.Scene.color_to_replace_A
 
 	bpy.types.Scene.modifiersVisibilityStateAll
 	

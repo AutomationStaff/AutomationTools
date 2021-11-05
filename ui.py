@@ -342,6 +342,45 @@ class VertexGroupsPanel(Panel):
 			
 			column.operator("object.sync_vg", text = "Sync with Bones", icon='UV_SYNC_SELECT')
 
+class VertexPaintPanel(Panel):
+	bl_label = "Vertex Paint"
+	bl_idname = "OBJECT_PT_AUT_VERTEX_PAINT_PANEL"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'	
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = ModelingPanel.bl_idname
+	
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and context.object.type == 'MESH'
+	
+	def draw(self, context):
+		layout = self.layout
+		row = layout.row(align=True)
+
+		row.prop(bpy.context.scene, 'replace_vertex_paint_value', text = 'Replace')
+		row.prop(bpy.context.scene, 'vertex_paint_only_selected', text = 'Selected')
+		row.prop(bpy.context.scene, 'fill_vertex_paint', text = 'Face')
+		row.prop(bpy.context.scene, 'clamp_vertex_paint_value', text = 'Clamp')
+
+		row = layout.row(align=True)
+		row.label(text = 'New:')
+		row.operator("object.replace_vertex_color", text = "Erase").color_new = "Erase"
+		row.operator("object.replace_vertex_color", text = "R").color_new = "Red"
+		row.operator("object.replace_vertex_color", text = "G").color_new = "Green"
+		row.operator("object.replace_vertex_color", text = "B").color_new = "Blue"
+		row.operator("object.replace_vertex_color", text = "A").color_new = "A"
+		row.prop(bpy.context.scene, 'vertex_color_alpha_value', text = '')
+
+		row = layout.row(align=True)
+		row.label(text = 'Replace:')
+		row.prop(bpy.context.scene, 'color_to_replace_R', text = 'R')
+		row.prop(bpy.context.scene, 'color_to_replace_G', text = 'G')
+		row.prop(bpy.context.scene, 'color_to_replace_B', text = 'B')
+		row.prop(bpy.context.scene, 'color_to_replace_A', text = 'A')
+
+		
 class BrushPanel(Panel):
 	bl_label = "Brush"
 	bl_idname = "OBJECT_PT_AUT_RIG_SK_BRUSH_PANEL"
@@ -1069,6 +1108,7 @@ classes = (
 	UVsPanel,
 	BonesPanel,
 	VertexGroupsPanel,
+	VertexPaintPanel,
 	ShapeKeysPanel,
 	BrushPanel,
 	BrushAddSubPanel,
