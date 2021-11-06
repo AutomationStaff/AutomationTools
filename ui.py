@@ -359,26 +359,26 @@ class VertexPaintPanel(Panel):
 		layout = self.layout
 		row = layout.row(align=True)
 
-		row.prop(bpy.context.scene, 'replace_vertex_paint_value', text = 'Replace')
-		row.prop(bpy.context.scene, 'vertex_paint_only_selected', text = 'Selected')
-		row.prop(bpy.context.scene, 'fill_vertex_paint', text = 'Face')
-		row.prop(bpy.context.scene, 'clamp_vertex_paint_value', text = 'Clamp')
+		row.prop(bpy.context.scene, 'vertex_paint_only_selected', text = 'Selected', toggle = 1)
+		if bpy.context.scene.vertex_paint_only_selected:
+			row.prop(bpy.context.scene, 'fill_vertex_paint', text = 'Face', toggle = 1)		
 
 		row = layout.row(align=True)
-		row.label(text = 'New:')
-		row.operator("object.replace_vertex_color", text = "Erase").color_new = "Erase"
-		row.operator("object.replace_vertex_color", text = "R").color_new = "Red"
-		row.operator("object.replace_vertex_color", text = "G").color_new = "Green"
-		row.operator("object.replace_vertex_color", text = "B").color_new = "Blue"
-		row.operator("object.replace_vertex_color", text = "A").color_new = "A"
+		#row.label(text = 'Fill:')
+		row.operator("object.fill_vertex_color", text = "Erase").color_new = "Erase"
+		row.operator("object.fill_vertex_color", text = "R").color_new = "Red"
+		row.operator("object.fill_vertex_color", text = "G").color_new = "Green"
+		row.operator("object.fill_vertex_color", text = "B").color_new = "Blue"
+		row.operator("object.fill_vertex_color", text = "A").color_new = "A"
 		row.prop(bpy.context.scene, 'vertex_color_alpha_value', text = '')
-
 		row = layout.row(align=True)
-		row.label(text = 'Replace:')
-		row.prop(bpy.context.scene, 'color_to_replace_R', text = 'R')
-		row.prop(bpy.context.scene, 'color_to_replace_G', text = 'G')
-		row.prop(bpy.context.scene, 'color_to_replace_B', text = 'B')
-		row.prop(bpy.context.scene, 'color_to_replace_A', text = 'A')
+		row.prop(bpy.context.scene, 'replace_vertex_paint_value', text = 'Replace', toggle = 1)
+
+		if bpy.context.scene.replace_vertex_paint_value:
+			row = layout.row()			
+			row.label(text = 'RGBA:')
+			row.prop(bpy.context.scene, 'color_replace', text = '')
+			row.prop(bpy.context.scene, 'clamp_vertex_paint_value', text = 'Clamp', toggle = 1)
 
 		
 class BrushPanel(Panel):

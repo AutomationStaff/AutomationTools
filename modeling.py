@@ -1329,16 +1329,21 @@ class EdgeToCurve (Operator):
 
 		return {'FINISHED'}
 
-class VertexColorReplace (Operator):
-	bl_idname = "object.replace_vertex_color"
-	bl_label = "Replace Vertex Color"
-	bl_description = "Replace Vertex Color"
+class VertexColorFill (Operator):
+	bl_idname = "object.fill_vertex_color"
+	bl_label = "Fill Vertex Color"
+	bl_description = "Fill Vertex Color"
 	bl_options = {'REGISTER', 'UNDO'}
 	color_new: bpy.props.StringProperty(options = {'HIDDEN'})
 	
 	@classmethod
 	def poll(cls, context):
 		return bpy.context.active_object
+
+	def _fill_polygon_(self, obj, replace_with):
+		obj.use_paint_mask = True
+		bpy.data.brushes['Draw'].color = replace_with[:3]
+		bpy.ops.paint.vertex_color_set()
 	
 	def replace_vertex_color(self, context):
 		sel = bpy.context.selected_objects
@@ -1353,32 +1358,28 @@ class VertexColorReplace (Operator):
 				if_clamp = bpy.context.scene.clamp_vertex_paint_value
 				fill_polygon = bpy.context.scene.fill_vertex_paint
 				alpha_value = bpy.context.scene.vertex_color_alpha_value
-
-				replaceR = bpy.context.scene.color_to_replace_R
-				replaceG = bpy.context.scene.color_to_replace_G
-				replaceB = bpy.context.scene.color_to_replace_B
-				replaceA = bpy.context.scene.color_to_replace_A
+				replace = bpy.context.scene.color_replace
 
 				replace_with = None
 				if self.color_new == "Red":
-					replace_with = (1.0, 0.0, 0.0, 1.0)
+					replace_with = (1.0, 0.0, 0.0, 0.0)
 				elif self.color_new == "Green":
-					replace_with = (0.0, 1.0, 0.0, 1.0)
+					replace_with = (0.0, 1.0, 0.0, 0.0)
 				elif self.color_new == "Blue":
-					replace_with = (0.0, 0.0, 1.0, 1.0)
+					replace_with = (0.0, 0.0, 1.0, 0.0)
 				elif self.color_new == "A":
 					replace_with = (0.0, 0.0, 0.0, alpha_value)
 				elif self.color_new == "Erase":
-					replace_with = (1.0, 1.0, 1.0, 1.0)
+					replace_with = (1.0, 1.0, 1.0, 0.0)
 
 				to_replace = None
-				if replaceR:
+				if replace == 'R':
 					to_replace = (1.0, 0.0, 0.0)
-				elif replaceG:
+				elif replace == 'G':
 					to_replace = (0.0, 1.0, 0.0)
-				elif replaceB:
+				elif replace == 'B':
 					to_replace = (0.0, 0.0, 1.0)
-				elif replaceA:
+				elif replace == 'A':
 					to_replace = (0.0, 0.0, 0.0)
 		
 				if if_selected:
@@ -1387,32 +1388,36 @@ class VertexColorReplace (Operator):
 					verts = [v for v in obj.vertices]
 				
 				if if_replace:
-					for polygon in obj.polygons:
-						for v in verts:
-							for i, index in enumerate(polygon.vertices):
-								if v.index == index:
-									loop_index = polygon.loop_indices[i]							
-									if if_clamp:
-										for s in range(4):
-											obj.vertex_colors.active.data[loop_index].color[s] = round(obj.vertex_colors.active.data[loop_index].color[s], 0)
-									if obj.vertex_colors.active.data[loop_index].color[:3] == to_replace:
-										obj.vertex_colors.active.data[loop_index].color = replace_with
+					if fill_polygon is False:
+						for polygon in obj.polygons:
+							for v in verts:
+								for i, index in enumerate(polygon.vertices):
+									if v.index == index:
+										loop_index = polygon.loop_indices[i]							
+										if if_clamp:
+											for s in range(4):
+												obj.vertex_colors.active.data[loop_index].color[s] = round(obj.vertex_colors.active.data[loop_index].color[s], 0)
+										if obj.vertex_colors.active.data[loop_index].color[:3] == to_replace:
+											obj.vertex_colors.active.data[loop_index].color = replace_with
+					else:
+						self._fill_polygon_(obj, replace_with)
 				else:
-					for polygon in obj.polygons:
-						for v in verts:
-							for i, index in enumerate(polygon.vertices):
-								if v.index == index:
-									loop_index = polygon.loop_indices[i]
-									if self.color_new != "A":
-										obj.vertex_colors.active.data[loop_index].color = replace_with
-									else:
-										obj.vertex_colors.active.data[loop_index].color[3] = alpha_value
-				if fill_polygon:
-					obj.use_paint_mask = True
-					bpy.data.brushes['Draw'].color = replace_with[:3]
-					bpy.ops.paint.vertex_color_set()
+					if fill_polygon is False:
+						for polygon in obj.polygons:
+							for v in verts:
+								for i, index in enumerate(polygon.vertices):
+									if v.index == index:
+										loop_index = polygon.loop_indices[i]
+										if self.color_new != "A":
+											obj.vertex_colors.active.data[loop_index].color = replace_with
+										else:
+											obj.vertex_colors.active.data[loop_index].color[3] = alpha_value
+					else:
+						self._fill_polygon_(obj, replace_with)
 
 				bpy.ops.object.mode_set(mode = 'EDIT')	
+		else:
+			self.report({'WARNING'},  "Nothing selected")
 
 	def execute(self, context):	
 		self.replace_vertex_color(context)
@@ -1446,7 +1451,7 @@ classes = (
 	AddEmptyShapeKeys,
 	ToggleCarPaint,
 	GenerateHierarchy,
-	VertexColorReplace
+	VertexColorFill
 )
 
 # Functions
@@ -1525,14 +1530,17 @@ def register():
 	for cls in classes:
 		bpy.utils.register_class(cls)
 
-	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Activate Replace Mode. It rewrites selected colour on meshes. Click on the checkbox (R, G, B, A) colour you want to replace and press the new colour button above')
-	bpy.types.Scene.clamp_vertex_paint_value = bpy.props.BoolProperty(description = 'Clamp float values 0 to 1')
-	bpy.types.Scene.vertex_paint_only_selected = bpy.props.BoolProperty(description = 'Replace only selected vertices')
-	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty()
-	bpy.types.Scene.color_to_replace_R = bpy.props.BoolProperty(name = 'R')
-	bpy.types.Scene.color_to_replace_G = bpy.props.BoolProperty(name = 'G')
-	bpy.types.Scene.color_to_replace_B = bpy.props.BoolProperty(name = 'B')
-	bpy.types.Scene.color_to_replace_A = bpy.props.BoolProperty(name = 'A')
+	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Activate Replace Mode. Select (R, G, B, A) colour you want to replace and fill with a new color using fill buttons. If [Selected] is disabled, checked colour will be replaced by a new colour throughout the selected mesh(es)')
+	bpy.types.Scene.clamp_vertex_paint_value = bpy.props.BoolProperty(description = 'Clamp float values 0 to 1. Use it when you need to replace colour values not equal to 0 or 1')
+	bpy.types.Scene.vertex_paint_only_selected = bpy.props.BoolProperty(description = 'Fill selected only')
+	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty(description = 'Fill polygons')
+
+	bpy.types.Scene.color_replace = bpy.props.EnumProperty(
+	name="",
+	description="Select colour you want to replace",
+	items=[('R', 'R', ''), ('G', 'G', ''), ('B', 'B', ''), ('A', 'A', '')]
+	)
+
 	bpy.types.Scene.vertex_color_alpha_value = bpy.props.FloatProperty(name = '', soft_min = 0, soft_max = 1, description = 'Vertex color alpha value')
 
 	bpy.types.Scene.modifiersVisibilityStateAll = bpy.props.BoolProperty()
@@ -1630,14 +1638,14 @@ def register():
 	name="",
 	description="",
 	items=[('Bezier', 'Bezier', ''), ('Line', 'Line', '')]
-
 	)
 
 # Unregister
 def unregister():
 	for cls in reversed(classes):
 		bpy.utils.unregister_class(cls)
-	
+
+	bpy.types.Scene.color_replace
 	bpy.types.Scene.vertex_color_alpha_value
 	bpy.types.Scene.fill_vertex_paint
 	bpy.types.Scene.replace_vertex_paint_value
