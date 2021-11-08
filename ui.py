@@ -187,8 +187,18 @@ class NamingPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
+		column.label(text="Fix")
 		column.operator("object.object_fix_name", text = "Fix Object Names")
 		column.operator("object.fix_material_name", text = "Fix Material Names").symbol = "."
+		
+		column.separator(factor=1.0)
+		column.label(text="Copy/Paste")
+		column.operator("object.copy_object_name", text = "Copy")
+		column.operator("object.paste_object_name", text = "Paste")
+		
+		column.separator(factor=1.0)	
+		column.label(text="Bake")
+		column.operator("object.rename_lp_hp", text = "Low/High-poly")
 
 class HierarchyPanel(Panel):
 	bl_label = "Hierarchy"
@@ -206,6 +216,7 @@ class HierarchyPanel(Panel):
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Body").type = 'Body'
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Rim").type = 'Rim'
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Fixture").type = 'Fixture'
+		column.operator("object.create_group", text = "Create Group")
 
 class BonesPanel(Panel):
 	bl_label = "Bones"

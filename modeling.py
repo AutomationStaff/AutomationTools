@@ -1423,6 +1423,122 @@ class VertexColorFill (Operator):
 		self.replace_vertex_color(context)
 		return {'FINISHED'}
 
+class CopyObjectName(bpy.types.Operator):
+
+	bl_idname = "object.copy_object_name"
+	bl_label = "Copy Object Name"
+	bl_options = {'REGISTER', 'UNDO'} 
+	bl_description = "Copy Object Name"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def execute(self, context):       
+		obj = bpy.context.active_object        
+		if obj is not None:
+			bpy.context.window_manager.clipboard = obj.name 
+		else:
+			self.report({'WARNING'},  "Incorrect source object!")
+		
+		return {'FINISHED'}
+
+class PasteObjectName(bpy.types.Operator):
+
+	bl_idname = "object.paste_object_name"
+	bl_label = "Paste Object Name"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Paste Object Name"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def execute(self, context):       
+		sel = bpy.context.selected_objects
+		if len(sel):
+			for i in sel:
+				i.name = bpy.context.window_manager.clipboard
+		
+		return {'FINISHED'}
+
+class NameForBake(bpy.types.Operator):
+	# select 2 meshes and call the command. Highest will get suffix/name "_high", lowest "_low"
+	bl_idname = "object.rename_lp_hp"
+	bl_label = "Name For Bake"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Add *_lp and *_hp in the ends of high/low poly meshes. Select 2 meshes and run the script"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+	
+	def execute(self, context):
+	
+		sel = bpy.context.selected_objects        
+		if len(sel) == 2:            
+			if sel[0].type == 'MESH' and sel[1].type == 'MESH':
+				if len(sel[0].data.vertices) > len(sel[1].data.vertices):
+					sel[1].name = sel[0].name + "_low"
+					sel[0].name = sel[0].name + "_high"                    
+				else:
+					sel[1].name = sel[0].name + "_high"
+					sel[0].name = sel[0].name + "_low"
+
+		return {'FINISHED'}
+
+class CreateGroup(bpy.types.Operator):
+	#all LODs must be properly named before use
+	bl_idname = "object.create_group"
+	bl_label = "Create Group"
+	bl_options = {'REGISTER', 'UNDO'}	
+	bl_description = "Add a new Group(Empty) and parent selected objects inside"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None   
+
+	def execute(self, context):         
+		sel = bpy.context.selected_objects
+		ao = bpy.context.active_object
+		bpy.ops.object.select_all(action='DESELECT')
+
+		# if empty in the selection list, deselect it
+		for i in sel:
+			if i.type != "EMPTY":
+				i.select_set(True)
+		sel = bpy.context.selected_objects
+		bpy.context.view_layer.objects.active = ao     
+
+		# if the objects have a parent        
+		parent_empty = bpy.context.active_object.parent    
+		   
+		#select the collection where the active object is located
+		bpy.ops.object.select_act_obj_collection()        
+
+		if len(sel):
+			# get collection
+			col = sel[0].users_collection[0].name
+			 # if not Scene Collection
+			bpy.ops.collection.objects_add_active(collection = col)
+			
+			#add empty
+			bpy.ops.object.empty_add(type='PLAIN_AXES', radius=0.00001, location = (0,0,0))
+			new_empty = bpy.context.active_object
+
+			# parent if parent exists
+			if parent_empty is not None:
+				new_empty.parent = parent_empty				          
+
+			#parenting
+			for i in sel:                   
+				i.parent = new_empty
+
+			new_empty.name = "Group"
+		
+		return {'FINISHED'}
+
+
 
 classes = (
 	CopyApplyModifier,
@@ -1451,7 +1567,13 @@ classes = (
 	AddEmptyShapeKeys,
 	ToggleCarPaint,
 	GenerateHierarchy,
-	VertexColorFill
+	VertexColorFill,
+	CopyObjectName,
+	PasteObjectName,
+	NameForBake,
+	CreateGroup
+
+
 )
 
 # Functions
