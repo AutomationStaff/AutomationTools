@@ -114,6 +114,18 @@ class LightsUVsPanel(Panel):
 		blb.U = 0.5
 		blb.V = 0.5
 
+class GeometryPanel(Panel):
+	bl_label = "Geometry"
+	bl_idname = "OBJECT_PT_AUT_geometry_panel"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = ModelingPanel.bl_idname
+
+	def draw(self, context):
+		layout = self.layout
+
 class MaterialsPanel(Panel):
 	bl_label = "Materials"
 	bl_idname = "OBJECT_PT_automation_tools_materials_panel"
@@ -188,8 +200,8 @@ class NamingPanel(Panel):
 		column = layout.column(align=True)
 
 		column.label(text="Fix")
-		column.operator("object.object_fix_name", text = "Fix Object Names")
-		column.operator("object.fix_material_name", text = "Fix Material Names").symbol = "."
+		column.operator("object.object_fix_name", text = "Objects")
+		column.operator("object.fix_material_name", text = "Materials").symbol = "."
 		
 		column.separator(factor=1.0)
 		column.label(text="Copy/Paste")
@@ -217,6 +229,22 @@ class HierarchyPanel(Panel):
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Rim").type = 'Rim'
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Fixture").type = 'Fixture'
 		column.operator("object.create_group", text = "Create Group")
+
+class SocketsPanel(Panel):
+	bl_label = "Sockets"
+	bl_idname = "OBJECT_PT_automation_tools_sockets_panel"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'	
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = ModelingPanel.bl_idname
+	
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column(align=True)
+
+		column.operator(SocketInVertexSelectionCentre.bl_idname, text = "Add in Selection Centre")
+		column.operator(SocketInObjectPivotPosition.bl_idname, text = "Add in Pivot")
 
 class BonesPanel(Panel):
 	bl_label = "Bones"
@@ -390,7 +418,6 @@ class VertexPaintPanel(Panel):
 			row.label(text = 'RGBA:')
 			row.prop(bpy.context.scene, 'color_replace', text = '')
 			row.prop(bpy.context.scene, 'clamp_vertex_paint_value', text = 'Clamp', toggle = 1)
-
 		
 class BrushPanel(Panel):
 	bl_label = "Brush"
@@ -472,12 +499,12 @@ class WeightsPanel(Panel):
 
 class NormalsPanel(Panel):
 	bl_label = "Normals"
-	bl_idname = "OBJECT_PT_AUT_RIG_SK_NORMALS_PANEL"
+	bl_idname = "OBJECT_PT_AUT_NORMALS_PANEL"
 	bl_space_type = 'VIEW_3D'
 	bl_region_type = 'UI'	
 	bl_category = "Automation Tools"
 	bl_options =  {'DEFAULT_CLOSED'}
-	bl_parent_id = ModelingPanel.bl_idname
+	bl_parent_id = GeometryPanel.bl_idname
 	
 	def draw(self, context):
 		layout = self.layout
@@ -485,6 +512,20 @@ class NormalsPanel(Panel):
 			
 		column.operator("mesh.customdata_custom_splitnormals_clear", text = "Split")
 		column.operator("object.reset_normals_object", text = "Reset")
+
+class TransformPanel(Panel):
+	bl_label = "Transform"
+	bl_idname = "OBJECT_PT_TRANSFORM_PANEL"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'	
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = GeometryPanel.bl_idname
+	
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column(align=True)		
+		column.operator("object.move_to_scene_center", text = "Move to Origin")
 
 class ModesPanel(Panel):
 	bl_label = "Modes"
@@ -539,12 +580,12 @@ class CurvesPanel(Panel):
 
 class TriangulationPanel(Panel):
 	bl_label = "Triangulation"
-	bl_idname = "OBJECT_PT_AUT_RIG_SK_TRIANGULATION_PANEL"
+	bl_idname = "OBJECT_PT_AUT_TRIANGULATION_PANEL"
 	bl_space_type = 'VIEW_3D'
 	bl_region_type = 'UI'	
 	bl_category = "Automation Tools"
 	bl_options =  {'DEFAULT_CLOSED'}
-	bl_parent_id = ModelingPanel.bl_idname
+	bl_parent_id = GeometryPanel.bl_idname
 	
 	def draw(self, context):
 		layout = self.layout
@@ -1117,6 +1158,8 @@ classes = (
 	RiggingSkinningPanel,
 	ExportPanel,
 	UVsPanel,
+	GeometryPanel,
+	TransformPanel,
 	BonesPanel,
 	VertexGroupsPanel,
 	VertexPaintPanel,
@@ -1164,7 +1207,8 @@ classes = (
 	PIE_MT_RigSk_tools_modes,
 	RigSkToolsPMModes,
 	RigSkToolsPMDraw,
-	SelectBonesMenu
+	SelectBonesMenu,
+	SocketsPanel
 )
 
 # Functions

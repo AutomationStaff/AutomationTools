@@ -3,6 +3,7 @@ import bpy
 from bpy.utils import register_class, unregister_class
 from bpy.types import Operator, Panel, Menu
 import bmesh
+from mathutils import Vector, Matrix
 from random import random, uniform
 from . rigging_skinning import _class_method_mesh_
 
@@ -1272,7 +1273,7 @@ class CurveBetween2Objects (Operator):
 
 		return {'FINISHED'}
 
-class EdgeToCurve (Operator):
+class EdgeToCurve(Operator):
 	bl_idname = "object.edge_to_curve"
 	bl_label = "Edges to Curve"
 	bl_description = "Convert Edges to Curve"
@@ -1329,7 +1330,7 @@ class EdgeToCurve (Operator):
 
 		return {'FINISHED'}
 
-class VertexColorFill (Operator):
+class VertexColorFill(Operator):
 	bl_idname = "object.fill_vertex_color"
 	bl_label = "Fill Vertex Color"
 	bl_description = "Fill Vertex Color"
@@ -1338,7 +1339,7 @@ class VertexColorFill (Operator):
 	
 	@classmethod
 	def poll(cls, context):
-		return bpy.context.active_object
+		return context.active_object
 
 	def _fill_polygon_(self, obj, replace_with):
 		obj.use_paint_mask = True
@@ -1423,7 +1424,7 @@ class VertexColorFill (Operator):
 		self.replace_vertex_color(context)
 		return {'FINISHED'}
 
-class CopyObjectName(bpy.types.Operator):
+class CopyObjectName(Operator):
 
 	bl_idname = "object.copy_object_name"
 	bl_label = "Copy Object Name"
@@ -1443,7 +1444,7 @@ class CopyObjectName(bpy.types.Operator):
 		
 		return {'FINISHED'}
 
-class PasteObjectName(bpy.types.Operator):
+class PasteObjectName(Operator):
 
 	bl_idname = "object.paste_object_name"
 	bl_label = "Paste Object Name"
@@ -1462,7 +1463,7 @@ class PasteObjectName(bpy.types.Operator):
 		
 		return {'FINISHED'}
 
-class NameForBake(bpy.types.Operator):
+class NameForBake(Operator):
 	# select 2 meshes and call the command. Highest will get suffix/name "_high", lowest "_low"
 	bl_idname = "object.rename_lp_hp"
 	bl_label = "Name For Bake"
@@ -1487,7 +1488,7 @@ class NameForBake(bpy.types.Operator):
 
 		return {'FINISHED'}
 
-class CreateGroup(bpy.types.Operator):
+class CreateGroup(Operator):
 	#all LODs must be properly named before use
 	bl_idname = "object.create_group"
 	bl_label = "Create Group"
@@ -1538,6 +1539,99 @@ class CreateGroup(bpy.types.Operator):
 		
 		return {'FINISHED'}
 
+class MoveToSceneCenter(Operator):
+	bl_idname = "object.move_to_scene_center"
+	bl_label = "Move to Scene Center"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Move to Scene Centre"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def execute(self, context):		
+		sel = bpy.context.selected_objects		
+		if len(sel):
+			for i in sel:
+				if i.data.users == 1:
+					i.location = (0,0,0)
+				else:
+					self.report({'WARNING'},  "Nothing changed. The object has instances")
+		
+		return {'FINISHED'}
+
+class SocketInVertexSelectionCentre(Operator):    
+	bl_idname = "mesh.socket_in_vertex_selection_centre"
+	bl_label = "Socket In Vertex Selection Centre"
+	bl_description = "Create a Socket in the vertex selection centre"
+	
+	@classmethod
+	def poll(cls, context):
+		return context.area.type == "VIEW_3D" and context.mode == "EDIT_MESH" and context.object.type == "MESH"
+	
+	def execute(self, context):
+		obj = bpy.context.object
+		bm = bmesh.from_edit_mesh(obj.data)        
+		
+		verts = []
+		v_pos = Vector()        
+
+		for vert in bm.verts:
+			if vert.select == True:
+				verts.append(vert)
+
+		if len(verts) > 0:
+			for vert in verts:
+				v_pos += vert.co            
+
+			v_pos_avg = v_pos / len(verts)
+			orient = bpy.context.scene.transform_orientation_slots[0].type            
+
+			new_socket = bpy.data.objects.new("SOCKET_", None)
+			scene_collection = context.layer_collection.collection
+			scene_collection.objects.link(new_socket)
+			
+			if orient == "LOCAL":
+				new_matrix = obj.matrix_world @ Matrix.Translation(v_pos_avg)
+				new_socket.matrix_world = new_matrix                
+				
+			elif orient == "GLOBAL":
+				new_matrix = obj.matrix_world @ Matrix.Translation(v_pos_avg)
+				new_socket.matrix_world = new_matrix
+				new_socket.rotation_euler = ( 0, 0, 0 )
+
+			bpy.context.view_layer.objects.active = obj          
+			obj.select_set(True)
+			bpy.ops.mesh.select_all(action='DESELECT')             
+		else:
+			self.report({'WARNING'}, self.bl_idname + ": "+ "Nothing selected!")
+			
+		return {'FINISHED'}
+
+class SocketInObjectPivotPosition(Operator):
+	bl_idname = "object.socket_in_pivot"
+	bl_label = "Socket in Object Pivot"
+	bl_description = "Create Sockets in the objects' pivot positions"
+
+	@classmethod
+	def poll(cls, context):
+		return context.active_object is not None
+
+	def execute(self, context):        
+		sel = bpy.context.selected_objects         
+		if len(sel):            
+			for i in sel:               
+				#get pivot position
+				bpy.context.view_layer.objects.active = i
+				pos = i.location               
+				#create empty
+				bpy.ops.object.empty_add(type='PLAIN_AXES', radius=0.5, location = (pos))
+				bpy.context.active_object.name = 'SOCKET_'
+		else:
+			self.report({'WARNING'}, self.bl_idname + ": " + "Nothing selected!")
+
+		return {'FINISHED'}
+
 
 
 classes = (
@@ -1571,9 +1665,10 @@ classes = (
 	CopyObjectName,
 	PasteObjectName,
 	NameForBake,
-	CreateGroup
-
-
+	CreateGroup,
+	MoveToSceneCenter,
+	SocketInVertexSelectionCentre,
+	SocketInObjectPivotPosition
 )
 
 # Functions
