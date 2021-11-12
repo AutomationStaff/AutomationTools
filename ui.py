@@ -114,6 +114,20 @@ class LightsUVsPanel(Panel):
 		blb.U = 0.5
 		blb.V = 0.5
 
+class UVToolsPanel(Panel):
+	bl_label = "UV Tools"
+	bl_idname = "OBJECT_PT_automation_tools_uv_tools_panel"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'	
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = UVsPanel.bl_idname
+	
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column(align=True)
+		column.operator(ScaleUVs.bl_idname, text = "Scale UVs")
+
 class GeometryPanel(Panel):
 	bl_label = "Geometry"
 	bl_idname = "OBJECT_PT_AUT_geometry_panel"
@@ -1208,7 +1222,8 @@ classes = (
 	RigSkToolsPMModes,
 	RigSkToolsPMDraw,
 	SelectBonesMenu,
-	SocketsPanel
+	SocketsPanel,
+	UVToolsPanel
 )
 
 # Functions

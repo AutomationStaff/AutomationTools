@@ -673,6 +673,91 @@ class LightsUnwrap(Operator):
 
 		return {'FINISHED'}
 
+class ScaleUVs(Operator):
+	bl_label = "Scale UVs"
+	bl_idname = "object.scale_uvs"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Scale UVs"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+		#uv scale
+	def scale_XY(self, v, s, p ):
+		return (p[0] + s[0]*(v[0] - p[0]), p[1] + s[1]*(v[1] - p[1]))
+
+	def uv_scale(self, uv_map, scale, pivot ):
+		for uv_index in range(len(uv_map.data) ):
+			uv_map.data[uv_index].uv = self.scale_XY(uv_map.data[uv_index].uv, scale, pivot)
+
+	def uv_from_vert_first(self, uv_layer, v):
+		for l in v.link_loops:
+			uv_data = l[uv_layer]
+			return uv_data.uv
+
+
+	def execute(self, context):
+		bpy.ops.object.mode_set(mode = 'EDIT')
+		obj = context.object
+		bm = bmesh.from_edit_mesh(obj.data)
+
+		faces = [f for f in bm.faces]
+		f = faces[0]
+		face_perimeter = f.calc_perimeter()
+		#print (face_perimeter)
+		
+		verts = [v for v in f.verts]
+		print (verts)
+		verts = verts[:3]
+		print (verts)
+		#vert_indices = [v.index for v in verts]
+		#print (verts)
+		#print (vert_indices)				
+		#print (v1, v2, v3)
+
+		uv_layer = bm.loops.layers.uv.active
+
+		coord1 = self.uv_from_vert_first(uv_layer, verts[0])
+		coord2 = self.uv_from_vert_first(uv_layer, verts[1])
+		coord3 = self.uv_from_vert_first(uv_layer, verts[2])
+
+		#print(coord1, coord2, coord3)
+		
+		#print (coord1, coord2, coord3)
+		#bpy.ops.object.mode_set(mode = 'OBJECT')
+
+		#	uv_coords = obj.data.uv_layers.active.data[loop.vertex_index].uv
+
+		uv_edge_length_1 = (coord1 - coord2).length
+		uv_edge_length_2 = (coord2 - coord3).length
+		uv_edge_length_3 = (coord1 - coord3).length
+
+		#print (uv_edge_length_1, uv_edge_length_2, uv_edge_length_3)
+
+		face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
+
+		#print (face_uv_perimeter)
+		if face_uv_perimeter and face_perimeter > 0:
+			current_ratio = face_uv_perimeter/face_perimeter
+			#print (current_ratio)
+			if current_ratio > 0:
+				s = 0.5/current_ratio
+
+				bpy.ops.object.mode_set(mode = 'OBJECT')
+				#scale UVs
+				map_name = obj.data.uv_layers.keys()
+				uv_map = obj.data.uv_layers[map_name[0]]	
+				self.uv_scale(uv_map, (s, s), (0.5, 0.5))
+			else:
+				self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
+		else:
+			self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
+
+		bpy.ops.object.mode_set(mode = 'EDIT')
+
+		return {'FINISHED'}
+
 class ObjectFixName(Operator):	
 	bl_label = "Fix Object Name"
 	bl_idname = "object.object_fix_name"
@@ -1633,7 +1718,6 @@ class SocketInObjectPivotPosition(Operator):
 		return {'FINISHED'}
 
 
-
 classes = (
 	CopyApplyModifier,
 	ToggleModifiersByType,
@@ -1668,7 +1752,8 @@ classes = (
 	CreateGroup,
 	MoveToSceneCenter,
 	SocketInVertexSelectionCentre,
-	SocketInObjectPivotPosition
+	SocketInObjectPivotPosition,
+	ScaleUVs
 )
 
 # Functions
@@ -1868,11 +1953,6 @@ def unregister():
 	bpy.types.Scene.replace_vertex_paint_value
 	bpy.types.Scene.clamp_vertex_paint_value	
 	bpy.types.Scene.vertex_paint_only_selected
-	bpy.types.Scene.color_to_replace_R
-	bpy.types.Scene.color_to_replace_G
-	bpy.types.Scene.color_to_replace_B
-	bpy.types.Scene.color_to_replace_A
-
 	bpy.types.Scene.modifiersVisibilityStateAll
 	
 	for km, kmi in addon_keymaps:
