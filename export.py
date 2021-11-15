@@ -199,16 +199,17 @@ class BodyExport(Operator):
 
 									#apply modifiers Mirror first
 									if body_copy:
+										indicies = get_faces_indicies(self, body_copy)
 										if body_copy.modifiers:
 											# if mirror
 											if 'Mirror' in body_copy.modifiers:
 												body_copy.modifiers.active = body_copy.modifiers['Mirror']												
-												if_shape_keys(self, body_copy, 'Mirror', None)
+												if_shape_keys(self, body_copy, 'Mirror', indicies)
 											
 											# if no mirror										
 											elif 'Mirror' not in body_copy.modifiers and 'Triangulate' in body_copy.modifiers:
 												body_copy.modifiers.active = body_copy.modifiers['Triangulate']
-												if_shape_keys(self, body_copy, 'Triangulate', None)
+												if_shape_keys(self, body_copy, 'Triangulate', indicies)
 													
 											# apply the rest												
 											if body_copy.modifiers:
@@ -966,9 +967,9 @@ class NonDestructiveExport(Operator):
 		name : bpy.props.StringProperty()				
 
 		forced_object_mode(self, context, context.object)
-		######################################
-		## EXPORT FILES/LODS WITH HIERARCHY		
 
+		######################################
+		## EXPORT WITH HIERARCHY
 		for i in sel:
 			if i.type == 'MESH':
 				bpy.context.view_layer.objects.active = i		
@@ -1060,7 +1061,6 @@ class NonDestructiveExport(Operator):
 		
 			######################	
 			##  BATCH EXPORT
-
 			else:
 				if bpy.context.selected_objects:					
 					
@@ -1162,12 +1162,14 @@ def duplicate(cls, context, obj):
 	bpy.ops.object.duplicate()
 	bpy.ops.object.select_all(action='DESELECT')
 	return context.active_object
+
 def get_armature(cls, obj):
 	if (0 < len([q for q in obj.modifiers if q.type == "ARMATURE"])):
 		armature = obj.modifiers["Armature"].object
 		return armature
 	else:
 		return None
+
 def get_faces_indicies(cls, obj):
 	# called by the class only
 	bpy.ops.object.mode_set(mode = 'EDIT')
@@ -1175,10 +1177,11 @@ def get_faces_indicies(cls, obj):
 	pos = [f.index for f in bm.faces]
 	bpy.ops.object.mode_set(mode = 'OBJECT')
 	return pos
+
 def select_mirrored_faces(cls, obj, indicies):
+	bpy.ops.object.mode_set(mode = 'EDIT')
 	bm = bmesh.from_edit_mesh(obj.data)
 	bpy.ops.mesh.select_mode(type='FACE')
-
 	mirrored_faces = [f for f in bm.faces]
 	for f in mirrored_faces:			
 		for match in indicies:
@@ -1188,6 +1191,7 @@ def select_mirrored_faces(cls, obj, indicies):
 	bmesh.update_edit_mesh(obj.data)
 	# invert
 	bpy.ops.mesh.select_all(action='INVERT')
+
 def fix_mirrored_half_triangulation(cls, obj, indicies):	
 	if 'Triangulate' in obj.modifiers:
 		if obj.modifiers['Triangulate'].quad_method != 'FIXED':
@@ -1200,12 +1204,14 @@ def fix_mirrored_half_triangulation(cls, obj, indicies):
 			
 		bpy.ops.mesh.rotate_edge_triangulation_quads(quad_method="FIXED_ALTERNATE")
 		bpy.ops.object.mode_set(mode = 'OBJECT')
+
 def if_shape_keys(cls, mesh, modifier_name, indicies):
 	if mesh.data.shape_keys:
 		bpy.ops.object.apply_modifiers_with_shape_keys()
 	else:
 		bpy.ops.object.modifier_apply(modifier = modifier_name)
 		fix_mirrored_half_triangulation(cls, mesh, indicies)
+
 def batch_export(cls, context, export_type):
 	collection = context.view_layer.active_layer_collection
 	if collection is not None:
