@@ -126,7 +126,8 @@ class UVToolsPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
-		column.operator(ScaleUVs.bl_idname, text = "Scale UVs")
+		column.operator(CreateUVs.bl_idname, text = "Create")
+		column.operator(ScaleUVs.bl_idname, text = "Scale")
 
 class GeometryPanel(Panel):
 	bl_label = "Geometry"
