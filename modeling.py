@@ -5,7 +5,8 @@ from bpy.types import Operator, Panel, Menu
 import bmesh
 from mathutils import Vector, Matrix
 from random import random, uniform
-from . rigging_skinning import _class_method_mesh_
+from . rigging_skinning import _class_method_mesh_, go_back_to_initial_mode
+
 
 class CopyApplyModifier (Operator):
 	bl_idname = "view3d.copy_apply_modifier"
@@ -743,7 +744,6 @@ class ScaleUVs(Operator):
 		perimeter = (l1 + l2 + l3)
 		return perimeter
 
-
 	def execute(self, context):
 		obj = context.object		
 		if len(obj.data.uv_layers.keys()) > 0:
@@ -758,7 +758,7 @@ class ScaleUVs(Operator):
 			ind =  areas.index(max_val)
 
 			f = faces[ind]	
-			verts = [v for v in f.verts]
+			verts = [v for v in f.verts] 
 
 			verts = verts[:3]
 			face_perimeter = self.get_triangle_perimeter(verts)
@@ -1472,18 +1472,21 @@ class VertexColorFill(Operator):
 	
 	def replace_vertex_color(self, context):
 		sel = bpy.context.selected_objects
+		mode = bpy.context.mode
 		if len(sel) > 0:
 			for o in sel:
 				bpy.context.view_layer.objects.active = o
 				obj = o.data
 				bpy.ops.object.mode_set(mode = 'VERTEX_PAINT')
 
-				if_selected = bpy.context.scene.vertex_paint_only_selected
 				if_replace = bpy.context.scene.replace_vertex_paint_value
-				if_clamp = bpy.context.scene.clamp_vertex_paint_value
 				fill_polygon = bpy.context.scene.fill_vertex_paint
 				alpha_value = bpy.context.scene.vertex_color_alpha_value
 				replace = bpy.context.scene.color_replace
+
+				if if_replace and fill_polygon:
+					bpy.context.scene.fill_vertex_paint = False
+					fill_polygon = bpy.context.scene.fill_vertex_paint
 
 				replace_with = None
 				if self.color_new == "Red":
@@ -1494,8 +1497,10 @@ class VertexColorFill(Operator):
 					replace_with = (0.0, 0.0, 1.0, 0.0)
 				elif self.color_new == "A":
 					replace_with = (0.0, 0.0, 0.0, alpha_value)
-				elif self.color_new == "Erase":
+				elif self.color_new == "White":
 					replace_with = (1.0, 1.0, 1.0, 0.0)
+				elif self.color_new == "Black":
+					replace_with = (0.0, 0.0, 0.0, 0.0)
 
 				to_replace = None
 				if replace == 'R':
@@ -1504,10 +1509,12 @@ class VertexColorFill(Operator):
 					to_replace = (0.0, 1.0, 0.0)
 				elif replace == 'B':
 					to_replace = (0.0, 0.0, 1.0)
-				elif replace == 'A':
+				elif replace == 'White':
+					to_replace = (1.0, 1.0, 1.0)
+				elif replace == 'Black':
 					to_replace = (0.0, 0.0, 0.0)
-		
-				if if_selected:
+					
+				if if_replace == False:
 					verts = [v for v in obj.vertices if v.select]
 				else:
 					verts = [v for v in obj.vertices]
@@ -1518,15 +1525,20 @@ class VertexColorFill(Operator):
 							for v in verts:
 								for i, index in enumerate(polygon.vertices):
 									if v.index == index:
-										loop_index = polygon.loop_indices[i]							
-										if if_clamp:
-											for s in range(4):
-												obj.vertex_colors.active.data[loop_index].color[s] = round(obj.vertex_colors.active.data[loop_index].color[s], 0)
+										loop_index = polygon.loop_indices[i]
+										# paint
 										if obj.vertex_colors.active.data[loop_index].color[:3] == to_replace:
 											obj.vertex_colors.active.data[loop_index].color = replace_with
+										else:
+											# clamp and paint
+											for s in range(4):
+												obj.vertex_colors.active.data[loop_index].color[s] = round(obj.vertex_colors.active.data[loop_index].color[s], 0)
+											if obj.vertex_colors.active.data[loop_index].color[:3] == to_replace:
+												obj.vertex_colors.active.data[loop_index].color = replace_with
 					else:
 						self._fill_polygon_(obj, replace_with)
 				else:
+					# alpha
 					if fill_polygon is False:
 						for polygon in obj.polygons:
 							for v in verts:
@@ -1540,9 +1552,11 @@ class VertexColorFill(Operator):
 					else:
 						self._fill_polygon_(obj, replace_with)
 
-				bpy.ops.object.mode_set(mode = 'EDIT')	
+				bpy.ops.object.mode_set(mode = 'EDIT')
+				bpy.ops.mesh.select_all(action='DESELECT')
 		else:
-			self.report({'WARNING'},  "Nothing selected")
+			self.report({'WARNING'},  "Active object is hidden or not found!")
+		go_back_to_initial_mode(self, mode)
 
 	def execute(self, context):	
 		self.replace_vertex_color(context)
@@ -1872,19 +1886,15 @@ def register():
 	for cls in classes:
 		bpy.utils.register_class(cls)
 
-	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Activate Replace Mode. Select (R, G, B, A) colour you want to replace and fill with a new color using fill buttons. If [Selected] is disabled, checked colour will be replaced by a new colour throughout the selected mesh(es)')
-	bpy.types.Scene.clamp_vertex_paint_value = bpy.props.BoolProperty(description = 'Clamp float values 0 to 1. Use it when you need to replace colour values not equal to 0 or 1')
-	bpy.types.Scene.vertex_paint_only_selected = bpy.props.BoolProperty(description = 'Fill selected only')
-	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty(description = 'Fill polygons')
-
+	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Replace Vertex Color Mode')
+	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty(description = 'Fill Polygons. Fill Vertices is default')
 	bpy.types.Scene.color_replace = bpy.props.EnumProperty(
 	name="",
-	description="Select colour you want to replace",
-	items=[('R', 'R', ''), ('G', 'G', ''), ('B', 'B', ''), ('A', 'A', '')]
+	description="Select color to replace",
+	items=[('R', 'R', ''), ('G', 'G', ''), ('B', 'B', ''), ('White', 'White', ''), ('Black', 'Black', '')]
 	)
 
 	bpy.types.Scene.vertex_color_alpha_value = bpy.props.FloatProperty(name = '', soft_min = 0, soft_max = 1, description = 'Vertex color alpha value')
-
 	bpy.types.Scene.modifiersVisibilityStateAll = bpy.props.BoolProperty()
 	
 	keymaps_list = (
@@ -1991,8 +2001,6 @@ def unregister():
 	bpy.types.Scene.vertex_color_alpha_value
 	bpy.types.Scene.fill_vertex_paint
 	bpy.types.Scene.replace_vertex_paint_value
-	bpy.types.Scene.clamp_vertex_paint_value	
-	bpy.types.Scene.vertex_paint_only_selected
 	bpy.types.Scene.modifiersVisibilityStateAll
 	
 	for km, kmi in addon_keymaps:

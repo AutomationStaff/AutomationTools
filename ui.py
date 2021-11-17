@@ -411,28 +411,26 @@ class VertexPaintPanel(Panel):
 	
 	def draw(self, context):
 		layout = self.layout
-		row = layout.row(align=True)
-
-		row.prop(bpy.context.scene, 'vertex_paint_only_selected', text = 'Selected', toggle = 1)
-		if bpy.context.scene.vertex_paint_only_selected:
-			row.prop(bpy.context.scene, 'fill_vertex_paint', text = 'Face', toggle = 1)		
 
 		row = layout.row(align=True)
-		#row.label(text = 'Fill:')
-		row.operator("object.fill_vertex_color", text = "Erase").color_new = "Erase"
+		row.operator("object.fill_vertex_color", text = "BL").color_new = "Black"
+		row.operator("object.fill_vertex_color", text = "WH").color_new = "White"
 		row.operator("object.fill_vertex_color", text = "R").color_new = "Red"
 		row.operator("object.fill_vertex_color", text = "G").color_new = "Green"
 		row.operator("object.fill_vertex_color", text = "B").color_new = "Blue"
 		row.operator("object.fill_vertex_color", text = "A").color_new = "A"
 		row.prop(bpy.context.scene, 'vertex_color_alpha_value', text = '')
-		row = layout.row(align=True)
-		row.prop(bpy.context.scene, 'replace_vertex_paint_value', text = 'Replace', toggle = 1)
+
+		column = layout.column()
+		if bpy.context.scene.replace_vertex_paint_value == False:
+				column.prop(bpy.context.scene, 'fill_vertex_paint', text = 'Polygon', toggle = 1)
+
+		column.prop(bpy.context.scene, 'replace_vertex_paint_value', text = 'Replace', toggle = 1)
 
 		if bpy.context.scene.replace_vertex_paint_value:
 			row = layout.row()			
-			row.label(text = 'RGBA:')
+			row.label(text = 'Color to replace:')
 			row.prop(bpy.context.scene, 'color_replace', text = '')
-			row.prop(bpy.context.scene, 'clamp_vertex_paint_value', text = 'Clamp', toggle = 1)
 		
 class BrushPanel(Panel):
 	bl_label = "Brush"
