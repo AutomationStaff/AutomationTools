@@ -731,10 +731,14 @@ class ScaleUVs(Operator):
 		for uv_index in range(len(uv_map.data) ):
 			uv_map.data[uv_index].uv = self.scale_XY(uv_map.data[uv_index].uv, scale, pivot)
 
-	def uv_from_vert_first(self, uv_layer, v):
-		for l in v.link_loops:
-			uv_data = l[uv_layer]
-			return uv_data.uv
+	def uv_from_vert_first(self, uv_layer, v, f):
+		for loop in v.link_loops:
+			#print (v.index)
+			if loop.face == f:				
+				uv_data = loop[uv_layer]
+				#print ("Filtered face index: ", v.index)
+				#print(uv_data.uv)
+				return uv_data.uv
 	
 	def get_triangle_perimeter(self, verts):
 		perimeter = 0
@@ -757,17 +761,32 @@ class ScaleUVs(Operator):
 			max_val = max(areas)
 			ind =  areas.index(max_val)
 
-			f = faces[ind]	
-			verts = [v for v in f.verts] 
+			f = faces[ind]
+			#print("Face: ", f.index)
+			verts = [v for v in f.verts]
 
 			verts = verts[:3]
-			face_perimeter = self.get_triangle_perimeter(verts)
+			face_perimeter = self.get_triangle_perimeter(verts) 
 
 			uv_layer = bm.loops.layers.uv.active
 
-			coord1 = self.uv_from_vert_first(uv_layer, verts[0])
-			coord2 = self.uv_from_vert_first(uv_layer, verts[1])
-			coord3 = self.uv_from_vert_first(uv_layer, verts[2])
+			coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
+			coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
+			coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
+
+			#loops
+			v0 = [loop for loop in (verts[0].link_loops[:])]
+			v1 = [loop for loop in (verts[1].link_loops[:])]
+			v2 = [loop for loop in (verts[2].link_loops[:])]
+
+			#print(v0, v1, v2)
+
+			#for loop in v0:
+			#	print(loop.face.index)
+
+			#print(verts[0].link_loops[:])
+			#print(verts[1].link_loops[:])
+			#print(verts[2].link_loops[:]) 
 
 			uv_edge_length_1 = (coord1 - coord2).length
 			uv_edge_length_2 = (coord2 - coord3).length
