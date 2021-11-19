@@ -170,10 +170,19 @@ class BodyExport(Operator):
 							body_and_bounds = self.get_body_and_bounds(content)
 							body = body_and_bounds['body']
 							bounds = body_and_bounds['bounds']
+
 							if body and bounds:
 								#unhide the body and bounds if hidden
 								body_viewport_state = self.content_forced_unhide(body)
 								bounds_viewport_state = self.content_forced_unhide(bounds)
+
+								# if boundboxes have UVMaps
+								if len(bounds.data.uv_layers[:]) != 0:
+									bpy.context.view_layer.objects.active = bounds
+									for uvmap in bounds.data.uv_layers[:]:									
+										bpy.ops.mesh.uv_texture_remove()
+									bpy.context.view_layer.objects.active = None
+
 								
 								#initialize a copy
 								body_copy = None
@@ -197,19 +206,26 @@ class BodyExport(Operator):
 									collection.objects.unlink(body)
 									body_copy = bpy.context.view_layer.objects.active
 
+									# check body UVMaps count
+									if len(body_copy.data.uv_layers[:]) == 0:
+										self.report({'WARNING'}, self.bl_label + ": " + "Body does not have UVMaps!")
+
+									elif 0 < len(body_copy.data.uv_layers[:]) < 2:
+										body_copy.data.uv_layers.new(name='UVMap', do_init=True)
+
 									#apply modifiers Mirror first
 									if body_copy:
-										indicies = get_faces_indicies(self, body_copy)
+										indices = get_faces_indices(self, body_copy)
 										if body_copy.modifiers:
 											# if mirror
 											if 'Mirror' in body_copy.modifiers:
 												body_copy.modifiers.active = body_copy.modifiers['Mirror']												
-												if_shape_keys(self, body_copy, 'Mirror', indicies)
+												if_shape_keys(self, body_copy, 'Mirror', indices)
 											
 											# if no mirror										
 											elif 'Mirror' not in body_copy.modifiers and 'Triangulate' in body_copy.modifiers:
 												body_copy.modifiers.active = body_copy.modifiers['Triangulate']
-												if_shape_keys(self, body_copy, 'Triangulate', indicies)
+												if_shape_keys(self, body_copy, 'Triangulate', indices)
 													
 											# apply the rest												
 											if body_copy.modifiers:
@@ -408,17 +424,17 @@ class RimExport(Operator):
 
 						#apply modifiers Mirror first
 						if rim_copy.name in data:
-							indicies = get_faces_indicies(self, rim_copy)
+							indices = get_faces_indices(self, rim_copy)
 							if rim_copy.modifiers:
 								# if mirror
 								if 'Mirror' in rim_copy.modifiers:
 									rim_copy.modifiers.active = rim_copy.modifiers['Mirror']												
-									if_shape_keys(self, rim_copy, 'Mirror', indicies)
+									if_shape_keys(self, rim_copy, 'Mirror', indices)
 											
 								# if no mirror										
 								elif 'Mirror' not in rim_copy.modifiers and 'Triangulate' in rim_copy.modifiers:
 									rim_copy.modifiers.active = rim_copy.modifiers['Triangulate']
-									if_shape_keys(self, rim_copy, 'Triangulate', indicies)
+									if_shape_keys(self, rim_copy, 'Triangulate', indices)
 						
 								# apply the rest
 								if rim_copy.modifiers:
@@ -610,9 +626,9 @@ class FixturesExport(Operator):
 													# fix mirrored triangulation				
 													if 'Mirror' in fixture_copy.modifiers:
 														# get half
-														indicies = get_faces_indicies(self, fixture_copy)
+														indices = get_faces_indices(self, fixture_copy)
 														bpy.ops.object.modifier_apply(modifier = 'Mirror')								
-														fix_mirrored_half_triangulation(self, fixture_copy, indicies)
+														fix_mirrored_half_triangulation(self, fixture_copy, indices)
 
 													do_not_apply = ('ARMATURE')
 													# apply other modifiers except for armature								
@@ -1170,7 +1186,7 @@ def get_armature(cls, obj):
 	else:
 		return None
 
-def get_faces_indicies(cls, obj):
+def get_faces_indices(cls, obj):
 	# called by the class only
 	bpy.ops.object.mode_set(mode = 'EDIT')
 	bm = bmesh.from_edit_mesh(obj.data)
@@ -1178,13 +1194,13 @@ def get_faces_indicies(cls, obj):
 	bpy.ops.object.mode_set(mode = 'OBJECT')
 	return pos
 
-def select_mirrored_faces(cls, obj, indicies):
+def select_mirrored_faces(cls, obj, indices):
 	bpy.ops.object.mode_set(mode = 'EDIT')
 	bm = bmesh.from_edit_mesh(obj.data)
 	bpy.ops.mesh.select_mode(type='FACE')
 	mirrored_faces = [f for f in bm.faces]
 	for f in mirrored_faces:			
-		for match in indicies:
+		for match in indices:
 			if f.index == match:
 				f.select = True
 	bm.select_flush(True)
@@ -1192,7 +1208,7 @@ def select_mirrored_faces(cls, obj, indicies):
 	# invert
 	bpy.ops.mesh.select_all(action='INVERT')
 
-def fix_mirrored_half_triangulation(cls, obj, indicies):	
+def fix_mirrored_half_triangulation(cls, obj, indices):	
 	if 'Triangulate' in obj.modifiers:
 		if obj.modifiers['Triangulate'].quad_method != 'FIXED':
 			obj.modifiers['Triangulate'].quad_method = 'FIXED'
@@ -1200,17 +1216,17 @@ def fix_mirrored_half_triangulation(cls, obj, indicies):
 		bpy.ops.object.mode_set(mode = 'EDIT')
 		bpy.ops.mesh.select_all(action='DESELECT')
 		
-		select_mirrored_faces(cls, obj, indicies)
+		select_mirrored_faces(cls, obj, indices)
 			
 		bpy.ops.mesh.rotate_edge_triangulation_quads(quad_method="FIXED_ALTERNATE")
 		bpy.ops.object.mode_set(mode = 'OBJECT')
 
-def if_shape_keys(cls, mesh, modifier_name, indicies):
+def if_shape_keys(cls, mesh, modifier_name, indices):
 	if mesh.data.shape_keys:
 		bpy.ops.object.apply_modifiers_with_shape_keys()
 	else:
 		bpy.ops.object.modifier_apply(modifier = modifier_name)
-		fix_mirrored_half_triangulation(cls, mesh, indicies)
+		fix_mirrored_half_triangulation(cls, mesh, indices)
 
 def batch_export(cls, context, export_type):
 	collection = context.view_layer.active_layer_collection
