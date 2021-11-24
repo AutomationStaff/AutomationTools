@@ -17,7 +17,7 @@ class StandardBatchExport(Operator):
 
 	# main export function
 	def exp(self, obj_name, file_path):		
-		bpy.ops.export_scene.fbx(filepath=(file_path + "/" + obj_name + ".fbx"), check_existing=False, use_selection=True, object_types={'EMPTY','ARMATURE','MESH'}, bake_anim=False, axis_forward='Y', axis_up='Z', add_leaf_bones=False, use_custom_props=True)
+		bpy.ops.export_scene.fbx(filepath=(file_path + "/" + obj_name + ".fbx"), check_existing=False, use_selection=True, object_types={'EMPTY','ARMATURE','MESH'}, bake_anim=False, axis_forward='Y', axis_up='Z', add_leaf_bones=False, use_custom_props=True, mesh_smooth_type='EDGE')
 
 	def execute(self, context):
 		file_path = bpy.context.scene.export_path
@@ -108,7 +108,7 @@ class BodyExport(Operator):
 		secondary_bone_axis='X',
 		add_leaf_bones=False,
 		apply_unit_scale=True,
-		mesh_smooth_type='OFF',
+		mesh_smooth_type='EDGE',
 		use_tspace=False,
 		use_mesh_modifiers=False
 		)
@@ -182,7 +182,6 @@ class BodyExport(Operator):
 									for uvmap in bounds.data.uv_layers[:]:									
 										bpy.ops.mesh.uv_texture_remove()
 									bpy.context.view_layer.objects.active = None
-
 								
 								#initialize a copy
 								body_copy = None
@@ -356,7 +355,7 @@ class RimExport(Operator):
 		secondary_bone_axis='X',
 		add_leaf_bones=False,
 		apply_unit_scale=True,
-		mesh_smooth_type='OFF',
+		mesh_smooth_type='EDGE',
 		use_tspace=False,
 		use_mesh_modifiers=False
 		)
@@ -574,7 +573,7 @@ class FixturesExport(Operator):
 		secondary_bone_axis='X',
 		add_leaf_bones=False,
 		apply_unit_scale=True,
-		mesh_smooth_type='OFF',
+		mesh_smooth_type='EDGE',
 		use_tspace=False,
 		use_mesh_modifiers=False
 		)
