@@ -720,33 +720,43 @@ class HierarchyExport(Operator):
 				obj_list = list(bpy.context.scene.hierarchy_list.split(" "))
 				if obj_list:
 					for i in obj_list:
-						if i in bpy.data.objects:
-							bpy.data.objects[i].select_set(True)
-						else:
-							self.report({'WARNING'},  "Object doesn't exist")
-						#add lod property if lods
-						if bpy.context.scene.if_lods:
+						file = (hier_path + i + ".fbx")
+						if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
 							if i in bpy.data.objects:
-								if 'fbx_type' not in bpy.data.objects[i]:
-									bpy.data.objects[i]['fbx_type'] = "LodGroup"
+								bpy.data.objects[i].select_set(True)
+							else:
+								self.report({'WARNING'},  "Object doesn't exist")
+							#add lod property if lods
+							if bpy.context.scene.if_lods:
+								if i in bpy.data.objects:
+									if 'fbx_type' not in bpy.data.objects[i]:
+										bpy.data.objects[i]['fbx_type'] = "LodGroup"
+							else:
+								#delete lod property if exists and if lods is false
+								if i in bpy.data.objects:
+									for i in obj_list:
+										if 'fbx_type' in bpy.data.objects[i]:
+											del bpy.data.objects[i]['fbx_type']
 						else:
-							#delete lod property if exists and if lods is false
-							if i in bpy.data.objects:
-								for i in obj_list:
-									if 'fbx_type' in bpy.data.objects[i]:
-										del bpy.data.objects[i]['fbx_type']
+							self.report({'WARNING'}, "Nothing exported. Check file's writing permissions")
+
 					# export
-					if bpy.context.selected_objects:
+					sel = bpy.context.selected_objects
+					if len(sel):
 						if bpy.context.selected_objects[0].type	== "EMPTY" and bpy.context.selected_objects[0].parent == None:
 							bpy.ops.object.non_destructive_export(if_batch = False, file_path = hier_path)
 						else:
 							bpy.ops.object.non_destructive_export(if_batch = True, file_path = hier_path)
+						# temporary fake report
+						for i in sel:
+							self.report({'INFO'}, hier_path + i.name + ".fbx")
+
 				else:
 					self.report({'WARNING'}, "Export list is empty!")
 			else:
 				self.report({'WARNING'}, "Export path not found!")
 		else:
-			self.report({'WARNING'}, 'The directory is not valid! Try selecting it again with Relative Path unchecked in the Blender file dialog settings.')
+			self.report({'WARNING'}, 'The directory is not valid! Try selecting it again with Relative Path unchecked in the Blender file dialog settings')
 		return {'FINISHED'}
 
 class NonDestructiveExport(Operator):   
@@ -821,7 +831,7 @@ class NonDestructiveExport(Operator):
 	
 	# main export function
 	def exp(self, obj_name):
-		bpy.ops.export_scene.fbx(filepath=(self.file_path + "/" + obj_name + ".fbx"), check_existing=False, use_selection=True, object_types={'EMPTY','ARMATURE','MESH'}, bake_anim=False, axis_forward='Y', axis_up='Z', add_leaf_bones=False, use_custom_props=True)
+		bpy.ops.export_scene.fbx(filepath=(self.file_path + "/" + obj_name + ".fbx"), check_existing=False, use_selection=True, object_types={'EMPTY','ARMATURE','MESH'}, bake_anim=False, axis_forward='Y', axis_up='Z', add_leaf_bones=False, use_custom_props=True, mesh_smooth_type='EDGE')
 	
 	def findCurves(self):
 		obj = bpy.ops.object
@@ -1029,7 +1039,7 @@ class NonDestructiveExport(Operator):
 
 									# Export
 									self.exp(p.name)									
-									self.report({'INFO'}, file)
+									#self.report({'INFO'}, file)
 																											
 									# if hidden 
 									if hidden:
@@ -1129,7 +1139,7 @@ class NonDestructiveExport(Operator):
 							# check file writing permissions
 							if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
 								self.exp(i.name)
-								self.report({'INFO'}, self.file_path + i.name + ".fbx")
+								#self.report({'INFO'}, self.file_path + i.name + ".fbx")
 							else:
 								self.report({'WARNING'}, "Nothing exported! Check file's writing permissions")
 							obj.select_all(action='DESELECT')					
