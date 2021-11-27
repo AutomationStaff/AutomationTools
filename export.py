@@ -4,6 +4,7 @@ from bpy.utils import register_class, unregister_class
 from bpy.types import Operator
 from pathlib import Path
 import os
+from stat import *
 
 class StandardBatchExport(Operator):
    
@@ -63,13 +64,13 @@ class StandardBatchExport(Operator):
 						file = file_path + i.name + ".fbx"
 					
 						# check file writing permissions						
-						if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
-							# export
-							self.exp(i.name, file_path)
-							self.report({'INFO'},  file_path + i.name + ".fbx")
-							o.select_all(action='DESELECT')
-						else:
-							self.report({'WARNING'}, "Nothing exported. Check file's writing permissions")
+						if os.access(file, os.W_OK) or os.access(file, os.F_OK):
+							os.chmod(file, 0o744)
+						# export
+						self.exp(i.name, file_path)
+						self.report({'INFO'},  file_path + i.name + ".fbx")
+						o.select_all(action='DESELECT')
+
 				
 					# Back to original selection
 					o.select_all(action='DESELECT')
@@ -250,12 +251,11 @@ class BodyExport(Operator):
 								if bpy.context.scene.export_flag:
 									if name:
 										if file_path:
-											if os.access(full_name, os.W_OK) or os.access(full_name, os.F_OK) == False:
-												if bpy.context.scene.debug_mode == False:
-													self.exp(name, file_path)
-													self.report({'INFO'}, full_name)
-											else:
-												self.report({'WARNING'}, "Body Export: Nothing exported. Check file's writing permissions!")			
+											if os.access(file, os.W_OK) or os.access(file, os.F_OK):
+												os.chmod(file, 0o744)
+											if bpy.context.scene.debug_mode == False:
+												self.exp(name, file_path)
+												self.report({'INFO'}, full_name)			
 										else:
 											self.report({'WARNING'}, 'File path is not valid!')
 									else:
@@ -469,20 +469,20 @@ class RimExport(Operator):
 				#export
 				if bpy.context.scene.debug_mode == False:
 					if file_path:
-						if os.access(full_name, os.W_OK) or os.access(full_name, os.F_OK) == False:
-							if complex_rim is not None:
-								complex_rim.select_set(True)
-								bpy.context.view_layer.objects.active = complex_rim
+						if os.access(file, os.W_OK) or os.access(file, os.F_OK):
+							os.chmod(file, 0o744)
+						if complex_rim is not None:
+							complex_rim.select_set(True)
+							bpy.context.view_layer.objects.active = complex_rim
 
-							if bpy.context.scene.export_flag:									
-								self.rim_export(collection_name, file_path)
-								self.report({'INFO'}, full_name)
-							else:
-								self.report({'WARNING'},  "Export Failed! Unequal vertex count of shape keys. Find the debugging details in the console window")
-								bpy.context.scene.export_flag = True
-							bpy.ops.object.select_all(action='DESELECT')
+						if bpy.context.scene.export_flag:									
+							self.rim_export(collection_name, file_path)
+							self.report({'INFO'}, full_name)
 						else:
-							self.report({'WARNING'}, "Rim Export: Nothing exported. Check file's writing permissions!")
+							self.report({'WARNING'},  "Export Failed! Unequal vertex count of shape keys. Find the debugging details in the console window")
+							bpy.context.scene.export_flag = True
+						bpy.ops.object.select_all(action='DESELECT')
+
 					else:
 						self.report({'WARNING'}, 'File path is not valid!')				
 
@@ -655,17 +655,17 @@ class FixturesExport(Operator):
 											bpy.context.view_layer.objects.active = fixture_copy
 					
 										if file_path:
-											if os.access(full_name, os.W_OK) or os.access(full_name, os.F_OK) == False:
-												if complex_fixture is not None:
-													complex_fixture.select_set(True)								
-													bpy.context.view_layer.objects.active = complex_fixture
-												# export
-												self.fixture_export(collection_name, file_path)
-												self.report({'INFO'}, full_name)
+											if os.access(file, os.W_OK) or os.access(file, os.F_OK):
+												os.chmod(file, 0o744)
+											if complex_fixture is not None:
+												complex_fixture.select_set(True)								
+												bpy.context.view_layer.objects.active = complex_fixture
+											# export
+											self.fixture_export(collection_name, file_path)
+											self.report({'INFO'}, full_name)
 
-												bpy.ops.object.select_all(action='DESELECT')
-											else:
-												self.report({'WARNING'}, "Fixture Export: Nothing exported. Check file's writing permissions!")
+											bpy.ops.object.select_all(action='DESELECT')
+
 										else:
 											self.report({'WARNING'}, 'File path is not valid!')
 									else:
@@ -721,24 +721,23 @@ class HierarchyExport(Operator):
 				if obj_list:
 					for i in obj_list:
 						file = (hier_path + i + ".fbx")
-						if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
-							if i in bpy.data.objects:
-								bpy.data.objects[i].select_set(True)
-							else:
-								self.report({'WARNING'},  "Object doesn't exist")
-							#add lod property if lods
-							if bpy.context.scene.if_lods:
-								if i in bpy.data.objects:
-									if 'fbx_type' not in bpy.data.objects[i]:
-										bpy.data.objects[i]['fbx_type'] = "LodGroup"
-							else:
-								#delete lod property if exists and if lods is false
-								if i in bpy.data.objects:
-									for i in obj_list:
-										if 'fbx_type' in bpy.data.objects[i]:
-											del bpy.data.objects[i]['fbx_type']
+						if os.access(file, os.W_OK) or os.access(file, os.F_OK):
+							os.chmod(file, 0o744)
+						if i in bpy.data.objects:
+							bpy.data.objects[i].select_set(True)
 						else:
-							self.report({'WARNING'}, "Nothing exported. Check file's writing permissions")
+							self.report({'WARNING'},  "Object doesn't exist")
+						#add lod property if lods
+						if bpy.context.scene.if_lods:
+							if i in bpy.data.objects:
+								if 'fbx_type' not in bpy.data.objects[i]:
+									bpy.data.objects[i]['fbx_type'] = "LodGroup"
+						else:
+							#delete lod property if exists and if lods is false
+							if i in bpy.data.objects:
+								for i in obj_list:
+									if 'fbx_type' in bpy.data.objects[i]:
+										del bpy.data.objects[i]['fbx_type']
 
 					# export
 					sel = bpy.context.selected_objects
@@ -750,7 +749,6 @@ class HierarchyExport(Operator):
 						# temporary fake report
 						for i in sel:
 							self.report({'INFO'}, hier_path + i.name + ".fbx")
-
 				else:
 					self.report({'WARNING'}, "Export list is empty!")
 			else:
@@ -1022,62 +1020,61 @@ class NonDestructiveExport(Operator):
 							
 								file = self.file_path + p.name + ".fbx"
 								# check file's writing permissions
-								if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
-									#if flipped meshes
-									dupl_meshes = self.duplicateMeshesWithNegativeScale()
-									if dupl_meshes:
-										self.invertFlippedNormals(dupl_meshes)
-										for i in dupl_meshes:
-											i.select_set(True)
+								if os.access(file, os.W_OK) or os.access(file, os.F_OK):
+									os.chmod(file, 0o744)
+								#if flipped meshes
+								dupl_meshes = self.duplicateMeshesWithNegativeScale()
+								if dupl_meshes:
+									self.invertFlippedNormals(dupl_meshes)
+									for i in dupl_meshes:
+										i.select_set(True)
 
-									#if converted curves
-									conv = self.convertCurves()					
-									if conv:
-										self.invertFlippedNormals(conv)
-										for i in conv:
-											i.select_set(True)
+								#if converted curves
+								conv = self.convertCurves()					
+								if conv:
+									self.invertFlippedNormals(conv)
+									for i in conv:
+										i.select_set(True)
 
-									# Export
-									self.exp(p.name)									
-									#self.report({'INFO'}, file)
+								# Export
+								self.exp(p.name)									
+								#self.report({'INFO'}, file)
 																											
-									# if hidden 
-									if hidden:
-										for o in hidden:
-											o.hide_viewport = True
+								# if hidden 
+								if hidden:
+									for o in hidden:
+										o.hide_viewport = True
 
-									# Unlock
-									obj.select_all(action='DESELECT')
-									for ch in p.children:										
-										ch.hide_select=False
-										ch.select_set(True)	
-										if ch.children:
-											for ch2 in ch.children:
-												ch2.hide_select=False
-												ch2.select_set(True)
-												if ch2.children:
-													for ch3 in ch2.children:
-														ch3.hide_select=False
-														ch3.select_set(True)
-									# Cleanup							
-									if conv is not None:
-										bpy.ops.object.select_all(action='DESELECT')
-										for c in conv:
-											c.select_set(True)
-											bpy.ops.object.delete()
+								# Unlock
+								obj.select_all(action='DESELECT')
+								for ch in p.children:										
+									ch.hide_select=False
+									ch.select_set(True)	
+									if ch.children:
+										for ch2 in ch.children:
+											ch2.hide_select=False
+											ch2.select_set(True)
+											if ch2.children:
+												for ch3 in ch2.children:
+													ch3.hide_select=False
+													ch3.select_set(True)
+								# Cleanup							
+								if conv is not None:
+									bpy.ops.object.select_all(action='DESELECT')
+									for c in conv:
+										c.select_set(True)
+										bpy.ops.object.delete()
 
-									if dupl_meshes is not None:			
-										bpy.ops.object.select_all(action='DESELECT')
-										for m in dupl_meshes:
-											m.select_set(True)
-											bpy.ops.object.delete()
+								if dupl_meshes is not None:			
+									bpy.ops.object.select_all(action='DESELECT')
+									for m in dupl_meshes:
+										m.select_set(True)
+										bpy.ops.object.delete()
 
-									#back to original selection
-									for i in sel_return:
-											i.select_set(True)
-									bpy.context.view_layer.objects.active = ao
-								else:
-									self.report({'WARNING'}, "Nothing exported. Check file's writing permissions")
+								#back to original selection
+								for i in sel_return:
+										i.select_set(True)
+								bpy.context.view_layer.objects.active = ao
 					else:
 						self.report({'WARNING'}, "No parent nodes selected")
 				else:
@@ -1137,11 +1134,11 @@ class NonDestructiveExport(Operator):
 							file = self.file_path + i.name + ".fbx"
 							
 							# check file writing permissions
-							if os.access(file, os.W_OK) or os.access(file, os.F_OK) == False:
-								self.exp(i.name)
-								#self.report({'INFO'}, self.file_path + i.name + ".fbx")
-							else:
-								self.report({'WARNING'}, "Nothing exported! Check file's writing permissions")
+							if os.access(file, os.W_OK) or os.access(file, os.F_OK):
+								os.chmod(file, 0o744)
+							self.exp(i.name)
+							#self.report({'INFO'}, self.file_path + i.name + ".fbx")
+
 							obj.select_all(action='DESELECT')					
 
 					# Unlock
