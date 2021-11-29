@@ -7,7 +7,6 @@ from mathutils import Vector, Matrix
 from random import random, uniform
 from . rigging_skinning import _class_method_mesh_, go_back_to_initial_mode
 
-
 class CopyApplyModifier (Operator):
 	bl_idname = "view3d.copy_apply_modifier"
 	bl_label = "Duplicate Apply Shrinkwrap"
@@ -674,62 +673,99 @@ class LightsUnwrap(Operator):
 
 		return {'FINISHED'}
 
-class CreateUVs(Operator):	
+class UVSeamsFromHardEdges(Operator):
+	bl_label = "UV Seams from Hard Edges"
+	bl_idname = "mesh.uv_seams_from_hard_edges"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = 'Create UV Seams based on mesh Hard Edges'
+
+	@classmethod
+	def poll(cls, context):
+		return context.mode == "EDIT_MESH"
+
+	def execute(self, context):
+		obj = bpy.context.object
+		bm = bmesh.from_edit_mesh(obj.data)
+		#get selection
+		sel = [f for f in bm.faces if f.select]
+		bpy.ops.mesh.select_all(action='DESELECT')
+		edges = [e for e in bm.edges if e.smooth == False]
+		for i in edges:
+			i.select_set(True)
+		bpy.ops.mesh.mark_seam(clear=False)
+		for i in edges:
+			i.select_set(False)
+		for f in sel:
+			f.select_set(True)
+		return {'FINISHED'}
+
+class CreateUVs(Operator):
 	bl_idname = "object.create_uvs_by_hard_edges"
 	bl_label = "Create UVs"
 	bl_options = {'REGISTER', 'UNDO'}
 	bl_description = "Unwrap mesh(es)"
 
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and context.mode == "EDIT_MESH"
+
 	def execute(self, context):
-		sel = bpy.context.selected_objects
-		if context.mode == 'OBJECT':
-			bpy.ops.object.select_all(action='DESELECT')
-		if sel:
-			for i in sel:
-				bpy.ops.object.mode_set(mode='OBJECT')
-				bpy.ops.object.select_all(action='DESELECT')
-				bpy.context.view_layer.objects.active = i
-				i.select_set(True)
-				bpy.ops.object.mode_set(mode='EDIT')	
-				bpy.ops.mesh.select_all(action='DESELECT')
+		if bpy.context.scene.tool_settings.use_uv_select_sync:
+			bpy.context.scene.tool_settings.use_uv_select_sync = False
 
-				bpy.ops.object.mode_set(mode='OBJECT')		
-				o = bpy.context.object.data
-				for i in o.edges:
-					if i.use_edge_sharp:
-						i.select = True
-				bpy.ops.object.mode_set(mode='EDIT')
-				bpy.ops.mesh.mark_seam(clear=False)
-
-				bpy.ops.mesh.select_all(action='SELECT')
-				bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-				bpy.ops.uv.average_islands_scale()
-
-				bpy.ops.mesh.select_all(action='DESELECT')
-				bpy.ops.object.mode_set(mode='OBJECT')
-				bpy.ops.object.scale_uvs()
-				bpy.ops.object.mode_set(mode='EDIT')
-		else:
-			self.report({'WARNING'}, bl_label + ": " + "Nothing selected!")
+		bpy.ops.uv.select_all(action='SELECT')
+		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
+		bpy.ops.mesh.scale_uvs()
 
 		return {'FINISHED'}
 
 class ScaleUVs(Operator):
-	bl_label = "Scale UVs"
-	bl_idname = "object.scale_uvs"
+	bl_label = "Scale Selected UVs"
+	bl_idname = "mesh.scale_uvs"
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = "Scale UVs 2cm = 256x256 pix"
+	bl_description = "Scale Selected UVs: 1 cm = 128x128 pix"
 
 	@classmethod
 	def poll(cls, context):
-		return context.object is not None
+		return context.object is not None and context.mode == "EDIT_MESH"
 	
-	def scale_XY(self, v, s, p ):
+	def scale_XY(self, v, s, p):
 		return (p[0] + s[0]*(v[0] - p[0]), p[1] + s[1]*(v[1] - p[1]))
 
-	def uv_scale(self, uv_map, scale, pivot ):
-		for uv_index in range(len(uv_map.data) ):
-			uv_map.data[uv_index].uv = self.scale_XY(uv_map.data[uv_index].uv, scale, pivot)
+	def uv_scale(self, uv_layer, uv_map, scale):		
+		bpy.ops.object.mode_set(mode = 'EDIT')
+		obj = bpy.context.object
+		bm = bmesh.from_edit_mesh(obj.data)
+		bm.select_flush_mode()
+		bmesh.update_edit_mesh(obj.data)
+		uv_layer = bm.loops.layers.uv.active
+		
+		#get selected uvs and coordinates
+		selected_uv_verts = []
+		coordinates = []
+		for v in bm.verts:
+			for loop in v.link_loops:		
+				uv_data = loop[uv_layer]
+				if uv_data.select:
+					selected_uv_verts.append(uv_data)
+					coordinates.append(uv_data.uv)
+
+		# get pivot
+		pivot = Vector ((0.0, 0.0))
+		for v in coordinates:
+			pivot += v		
+		
+		if pivot[0] != 0 and  pivot[1] != 0:
+			pivot = pivot/len(coordinates)
+		else:
+			pivot = ((0.5, 0.5))
+
+		#print (pivot[0], pivot[1])
+		#print (len(coordinates))
+		#print (selected_uv_verts)
+
+		for uv in selected_uv_verts:
+			uv.uv = self.scale_XY(uv.uv, scale, pivot)
 
 	def uv_from_vert_first(self, uv_layer, v, f):
 		for loop in v.link_loops:
@@ -753,63 +789,68 @@ class ScaleUVs(Operator):
 		if len(obj.data.uv_layers.keys()) > 0:
 			bpy.ops.object.mode_set(mode = 'EDIT')
 			bm = bmesh.from_edit_mesh(obj.data)
-
-			faces = [f for f in bm.faces]
-			# get the bigegst face
-			areas = [f.calc_area() for f in bm.faces]			
-			
-			max_val = max(areas)
-			ind =  areas.index(max_val)
-
-			f = faces[ind]
-			#print("Face: ", f.index)
-			verts = [v for v in f.verts]
-
-			verts = verts[:3]
-			face_perimeter = self.get_triangle_perimeter(verts) 
+			bpy.ops.uv.average_islands_scale()
 
 			uv_layer = bm.loops.layers.uv.active
 
-			coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
-			coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
-			coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
+			uv_face_list = []
+			for f in bm.faces:
+				for loop in f.loops:		
+					uv_data = loop[uv_layer]
+					if uv_data.select:
+						uv_face_list.append(loop.face)
+			
+			if len(uv_face_list):
+				#print(uv_face.index)
 
-			#loops
-			v0 = [loop for loop in (verts[0].link_loops[:])]
-			v1 = [loop for loop in (verts[1].link_loops[:])]
-			v2 = [loop for loop in (verts[2].link_loops[:])]
+				#faces = [f for f in bm.faces]
+				# get the biggest face
+				areas = [f.calc_area() for f in uv_face_list]			
+			
+				max_val = max(areas)
+				ind =  areas.index(max_val)
 
-			#print(v0, v1, v2)
+				f = uv_face_list[ind]
 
-			#for loop in v0:
-			#	print(loop.face.index)
+				#print("Face: ", f.index)
 
-			#print(verts[0].link_loops[:])
-			#print(verts[1].link_loops[:])
-			#print(verts[2].link_loops[:]) 
+				verts = [v for v in f.verts]
 
-			uv_edge_length_1 = (coord1 - coord2).length
-			uv_edge_length_2 = (coord2 - coord3).length
-			uv_edge_length_3 = (coord1 - coord3).length
+				verts = verts[:3]
+				face_perimeter = self.get_triangle_perimeter(verts) 
 
-			face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
+				coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
+				coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
+				coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
 
-			if face_uv_perimeter and face_perimeter > 0:
-				current_ratio = face_uv_perimeter/face_perimeter
+				#loops
+				v0 = [loop for loop in (verts[0].link_loops[:])]
+				v1 = [loop for loop in (verts[1].link_loops[:])]
+				v2 = [loop for loop in (verts[2].link_loops[:])]
 
-				if current_ratio > 0:
-					s = 0.5/current_ratio
+				uv_edge_length_1 = (coord1 - coord2).length
+				uv_edge_length_2 = (coord2 - coord3).length
+				uv_edge_length_3 = (coord1 - coord3).length
 
-					bpy.ops.object.mode_set(mode = 'OBJECT')
+				face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
 
-					#scale UVs
-					map_name = obj.data.uv_layers.keys()
-					uv_map = obj.data.uv_layers[map_name[0]]
-					self.uv_scale(uv_map, (s, s), (0.5, 0.5))
+				if face_uv_perimeter and face_perimeter > 0:
+					current_ratio = face_uv_perimeter/face_perimeter
+
+					if current_ratio > 0:
+						s = 0.5/current_ratio
+						bpy.ops.object.mode_set(mode = 'OBJECT')
+
+						#scale UVs
+						map_name = obj.data.uv_layers.keys()
+						uv_map = obj.data.uv_layers[map_name[0]]
+						self.uv_scale(uv_layer, uv_map, (s, s))
+					else:
+						self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
 				else:
-					self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
+					self.report({'WARNING'},  "UVs cannot be scaled! Incorrect UVs")
 			else:
-				self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
+				self.report({'WARNING'},  "No Vertex Selection!")
 
 			bpy.ops.object.mode_set(mode = 'EDIT')
 		else:
@@ -1473,7 +1514,7 @@ class EdgeToCurve(Operator):
 
 		return {'FINISHED'}
 
-class VertexColorFill(Operator):
+class VertexPaintrFill(Operator):
 	bl_idname = "object.fill_vertex_color"
 	bl_label = "Fill Vertex Color"
 	bl_description = "Fill Vertex Color"
@@ -1490,7 +1531,7 @@ class VertexColorFill(Operator):
 		bpy.ops.paint.vertex_color_set()
 	
 	def replace_vertex_color(self, context):
-		sel = bpy.context.selected_objects
+		sel = [obj for obj in bpy.context.selected_objects if obj.type != "EMPTY"]
 		mode = bpy.context.mode
 		if len(sel) > 0:
 			for o in sel:
@@ -1692,7 +1733,7 @@ class CreateGroup(Operator):
 			for i in sel:                   
 				i.parent = new_empty
 
-			new_empty.name = "Group"
+			new_empty.name = i.name
 		
 		return {'FINISHED'}
 
@@ -1817,7 +1858,7 @@ classes = (
 	AddEmptyShapeKeys,
 	ToggleCarPaint,
 	GenerateHierarchy,
-	VertexColorFill,
+	VertexPaintrFill,
 	CopyObjectName,
 	PasteObjectName,
 	NameForBake,
@@ -1826,7 +1867,8 @@ classes = (
 	SocketInVertexSelectionCentre,
 	SocketInObjectPivotPosition,
 	CreateUVs,
-	ScaleUVs
+	ScaleUVs,
+	UVSeamsFromHardEdges
 )
 
 # Functions
