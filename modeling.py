@@ -838,7 +838,7 @@ class ScaleUVs(Operator):
 					current_ratio = face_uv_perimeter/face_perimeter
 
 					if current_ratio > 0:
-						s = 50/current_ratio
+						s = 0.5/current_ratio
 						bpy.ops.object.mode_set(mode = 'OBJECT')
 
 						#scale UVs
