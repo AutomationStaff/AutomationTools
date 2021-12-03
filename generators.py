@@ -12,24 +12,12 @@ bl_info = {
     "category": "3D View"
 }
 
-
-class AddRim(bpy.types.Operator):
-    """Opens a web browser to the specified help page on github"""
-    bl_idname = "object.rim_generator_add_mesh"
-    bl_label = "Automation Tools Rim Mesh Adder"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        url = 'https://github.com/AutomationStaff/AutomationTools/wiki/Generators#rim-generator-tool'
-        webbrowser.open_new(url)
-        return {'FINISHED'}
-
-
 class CreateRim(bpy.types.Operator):
     """Adds a new rim project with new collections."""
     bl_idname = "object.rim_generator"
     bl_label = "Automation Tools Rim Creator"
     bl_options = {'REGISTER', 'UNDO'}
+    bl_desription = "Automation Tools Rim Creator"
 
     # ----------------------------------------------------------------------------------
 
@@ -161,13 +149,16 @@ class CreateRim(bpy.types.Operator):
     @staticmethod
     def set_object_mode():
         try:
-            mode_is = bpy.context.active_object.mode
+            mode_is = None
+            obj = bpy.context.active_object
+            if obj:
+                mode_is = bpy.context.active_object.mode
 
-            if mode_is != 'OBJECT':
+            if mode_is is not None and mode_is != 'OBJECT':
                 bpy.ops.object.mode_set(mode='OBJECT', toggle=True)
 
         except AttributeError:
-            print("No object selected.")
+            self.report({'WARNING'},  "No object selected")
             pass
 
     @staticmethod
@@ -179,7 +170,7 @@ class CreateRim(bpy.types.Operator):
                 bpy.ops.object.mode_set(mode='EDIT', toggle=True)
 
         except AttributeError:
-            print("No object selected.")
+            self.report({'WARNING'},  "No object selected")
             pass
 
     @staticmethod
@@ -234,7 +225,7 @@ class CreateRim(bpy.types.Operator):
         materials = []
 
         for mats in range(len(mat_names)):
-            print(mats)
+            #print(mats)
             try:
                 materials.append(bpy.data.materials[mat_names[mats]])
             except KeyError:
@@ -244,8 +235,8 @@ class CreateRim(bpy.types.Operator):
                 bsdf = nodes.get('Principled BSDF')
                 bsdf.inputs[0].default_value = colors[mats]
 
-            print(materials[mats])
-            print(colors[mats])
+            #print(materials[mats])
+            #print(colors[mats])
 
             new_mesh.data.materials.append(materials[mats])
 
@@ -615,8 +606,8 @@ class CreateRim(bpy.types.Operator):
             col.get("Automation Rim Project")
             try:
                 col.objects.link(nuts)
-            except RuntimeError:
-                print("Lug Nut object already linked to collection.")
+            except RuntimeError:                
+                self.report({'WARNING'},  "Lug Nut object already linked to collection")
             bpy.context.collection.objects.unlink(nuts)
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
         # rotates lug nuts with lugSpin variable to create a lug nut offset.
@@ -1203,7 +1194,7 @@ class CreateRim(bpy.types.Operator):
             self.assign_single_material_to_whole_mesh()
             self.smooth_all()
         elif not self.lugs:
-            print("lug nuts off")
+            self.report({'WARNING'},  "lug nuts off")
             # We likely can remove this elif statement if it's not needed for other functions later.
 
         # ----------------------------------------------------------------------------------
@@ -1216,18 +1207,21 @@ class CreateRim(bpy.types.Operator):
         return {'FINISHED'}
 
 
-classes = (
-    CreateRim,
-    AddRim,
-
-)
+#classes = (
+#    CreateRim
+#)
 
 
-def register():
-    for cls in classes:
-        bpy.utils.register_class(cls)
+#def register():
+#    for cls in classes:
+#        bpy.utils.register_class(cls)
 
+#def unregister():
+#    for cls in reversed(classes):
+#        bpy.utils.unregister_class(cls)
 
+def register(): 
+    bpy.utils.register_class(CreateRim)
+    
 def unregister():
-    for cls in reversed(classes):
-        bpy.utils.unregister_class(cls)
+    bpy.utils.unregister_class(CreateRim)

@@ -74,6 +74,8 @@ class ActiveMeshPanel(Panel):
 		split.operator("object.pick_active_mesh", icon='EYEDROPPER')
 		column.operator("object.add_armature_mod", text = "Add [Armature] [Modifier]")
 		column.operator(SelectActiveMesh.bl_idname, text = "Select").mode='EDIT'
+		column.separator()
+		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = 'active_mesh'
 
 class UVsPanel(Panel):
 	bl_label = "UVs"
@@ -113,6 +115,8 @@ class LightsUVsPanel(Panel):
 		blb = column.operator("object.lights_unwrap", text = "Bulb")
 		blb.U = 0.5
 		blb.V = 0.5
+
+		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = 'uvs_lights'
 
 class UVToolsPanel(Panel):
 	bl_label = "UV Tools"
@@ -180,9 +184,11 @@ class RimGeneratorPanel(Panel):
 	
 	def draw(self, context):
 		layout = self.layout
-		column = layout.column(align=False)
+		column = layout.column(align=True)
 		column.operator("OBJECT_OT_rim_generator", text = "New Rim Project")
-		column.operator("OBJECT_OT_rim_generator_add_mesh", text = "Add Mesh to Rim Project")
+		column.operator("object.add_bevel_width_driver", text = 'Lerp Bevel Width')
+		column.separator()
+		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = "rim_generator"
 
 class MaterialsCleanupPanel(Panel):
 	bl_label = "Cleanup"
@@ -606,6 +612,8 @@ class TriangulationPanel(Panel):
 		column = layout.column(align=True)
 		column.operator("mesh.rotate_edge_triangulation_quads", text = 'Rotate Edges Beauty').quad_method = 'BEAUTY'
 		column.operator("mesh.rotate_edge_triangulation_quads", text = 'Rotate Edges Fixed').quad_method = 'FIXED_ALTERNATE'
+		column.separator()
+		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = 'fix_triangulation'
 
 class ModifiersPanel(Panel):
 	bl_label = "Modifiers"
@@ -619,12 +627,13 @@ class ModifiersPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
-
-		column.operator("object.add_bevel_width_driver", text = 'Lerp Bevel Width')			
+		
 		column.operator("view3d.toggle_all_modifiers_visibility", text = "Toggle All")
 		column.operator("object.transfer_modifiers", text = "Transfer")
 		column.operator("view3d.copy_apply_modifier", text = "Copy and Apply")
 		column.operator("object.apply_modifiers_with_shape_keys", text = 'Apply [with Shape Keys]')
+		column.separator()
+		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = 'modifiers'
 
 class StandardBatchExportPanel(Panel):
 	bl_label = "Batch Export"
@@ -1164,6 +1173,26 @@ class RigSkToolsPMModes(Operator):
 		bpy.ops.wm.call_menu_pie(name="PIE_MT_RigSk_tools_modes")   
 		return {'FINISHED'}
 
+#Wiki
+class ATWiki(Operator):
+	bl_idname = "object.at_wiki"
+	bl_label = "Automation Tools Documentation"
+	bl_description = "Automation Tools Wiki on GitHub"
+	tool: bpy.props.StringProperty(options = {'HIDDEN'})
+
+	def execute(self, context):
+		links_map = {
+		"rim_generator" : 'https://github.com/AutomationStaff/AutomationTools/wiki/Generators#rim-generator-tool',
+		"active_mesh": 'https://github.com/AutomationStaff/AutomationTools/wiki/Active-Mesh',
+		'uvs_lights': 'https://github.com/AutomationStaff/AutomationTools/wiki/Modeling#lights',
+		'fix_triangulation': 'https://github.com/AutomationStaff/AutomationTools/wiki/Modeling#triangulation',
+		'modifiers': 'https://github.com/AutomationStaff/AutomationTools/wiki/Modeling#modifiers'
+		}
+
+		url = links_map[self.tool]
+		webbrowser.open_new(url)
+		return {'FINISHED'}
+
 classes = (
 	ActiveMeshPanel,
 	ModesPanel,
@@ -1223,7 +1252,8 @@ classes = (
 	RigSkToolsPMDraw,
 	SelectBonesMenu,
 	SocketsPanel,
-	UVToolsPanel
+	UVToolsPanel,
+	ATWiki
 )
 
 # Functions
