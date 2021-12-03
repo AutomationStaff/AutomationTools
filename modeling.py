@@ -710,12 +710,30 @@ class CreateUVs(Operator):
 		return context.object is not None and context.mode == "EDIT_MESH"
 
 	def execute(self, context):
-		if bpy.context.scene.tool_settings.use_uv_select_sync:
-			bpy.context.scene.tool_settings.use_uv_select_sync = False
+		if bpy.context.scene.tool_settings.use_uv_select_sync == False:
+			bpy.context.scene.tool_settings.use_uv_select_sync = True
+		
+		sel = bpy.context.selected_objects
+		bpy.ops.object.mode_set(mode = 'OBJECT')
+		bpy.ops.object.select_all(action='DESELECT')
+		
+		for obj in sel:
+			obj.select_set(True)
+			bpy.context.view_layer.objects.active = obj
+			bpy.ops.object.mode_set(mode = 'EDIT')
+			#if len(obj.data.uv_layers) > 0:
+			#	map_name = obj.data.uv_layers.keys()
+			#	uv_map = obj.data.uv_layers[map_name[0]]
+			#bpy.ops.uv.select_all(action='SELECT')
+			bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
+			#bpy.ops.mesh.scale_uvs()
+			
+			bpy.ops.object.mode_set(mode = 'OBJECT')
+			bpy.ops.object.select_all(action='DESELECT')
 
-		bpy.ops.uv.select_all(action='SELECT')
-		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-		bpy.ops.mesh.scale_uvs()
+		for o in sel:
+			o.select_set(True)
+		bpy.ops.object.mode_set(mode = 'EDIT')
 
 		return {'FINISHED'}
 
@@ -739,6 +757,9 @@ class ScaleUVs(Operator):
 		bm.select_flush_mode()
 		bmesh.update_edit_mesh(obj.data)
 		uv_layer = bm.loops.layers.uv.active
+
+		if bpy.context.scene.tool_settings.use_uv_select_sync:
+			bpy.context.scene.tool_settings.use_uv_select_sync = False
 		
 		#get selected uvs and coordinates
 		selected_uv_verts = []
@@ -785,76 +806,90 @@ class ScaleUVs(Operator):
 		return perimeter
 
 	def execute(self, context):
-		obj = context.object		
-		if len(obj.data.uv_layers.keys()) > 0:
+		sel = bpy.context.selected_objects
+		bpy.ops.object.mode_set(mode = 'OBJECT')
+		bpy.ops.object.select_all(action='DESELECT')
+		
+		for obj in sel:
+			obj.select_set(True)
+			bpy.context.view_layer.objects.active = obj
 			bpy.ops.object.mode_set(mode = 'EDIT')
-			bm = bmesh.from_edit_mesh(obj.data)
-			bpy.ops.uv.average_islands_scale()
 
-			uv_layer = bm.loops.layers.uv.active
+			#obj = context.object		
+			if len(obj.data.uv_layers.keys()) > 0:
+				bm = bmesh.from_edit_mesh(obj.data)
+				bpy.ops.uv.average_islands_scale()
 
-			uv_face_list = []
-			for f in bm.faces:
-				for loop in f.loops:		
-					uv_data = loop[uv_layer]
-					if uv_data.select:
-						uv_face_list.append(loop.face)
+				uv_layer = bm.loops.layers.uv.active
+
+				uv_face_list = []
+				for f in bm.faces:
+					for loop in f.loops:		
+						uv_data = loop[uv_layer]
+						if uv_data.select:
+							uv_face_list.append(loop.face)
 			
-			if len(uv_face_list):
-				#print(uv_face.index)
+				if len(uv_face_list):
+					#print(uv_face.index)
 
-				#faces = [f for f in bm.faces]
-				# get the biggest face
-				areas = [f.calc_area() for f in uv_face_list]			
+					#faces = [f for f in bm.faces]
+					# get the biggest face
+					areas = [f.calc_area() for f in uv_face_list]			
 			
-				max_val = max(areas)
-				ind =  areas.index(max_val)
+					max_val = max(areas)
+					ind =  areas.index(max_val)
 
-				f = uv_face_list[ind]
+					f = uv_face_list[ind]
 
-				#print("Face: ", f.index)
+					#print("Face: ", f.index)
 
-				verts = [v for v in f.verts]
+					verts = [v for v in f.verts]
 
-				verts = verts[:3]
-				face_perimeter = self.get_triangle_perimeter(verts) 
+					verts = verts[:3]
+					face_perimeter = self.get_triangle_perimeter(verts) 
 
-				coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
-				coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
-				coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
+					coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
+					coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
+					coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
 
-				#loops
-				v0 = [loop for loop in (verts[0].link_loops[:])]
-				v1 = [loop for loop in (verts[1].link_loops[:])]
-				v2 = [loop for loop in (verts[2].link_loops[:])]
+					#loops
+					v0 = [loop for loop in (verts[0].link_loops[:])]
+					v1 = [loop for loop in (verts[1].link_loops[:])]
+					v2 = [loop for loop in (verts[2].link_loops[:])]
 
-				uv_edge_length_1 = (coord1 - coord2).length
-				uv_edge_length_2 = (coord2 - coord3).length
-				uv_edge_length_3 = (coord1 - coord3).length
+					uv_edge_length_1 = (coord1 - coord2).length
+					uv_edge_length_2 = (coord2 - coord3).length
+					uv_edge_length_3 = (coord1 - coord3).length
 
-				face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
+					face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
 
-				if face_uv_perimeter and face_perimeter > 0:
-					current_ratio = face_uv_perimeter/face_perimeter
+					if face_uv_perimeter and face_perimeter > 0:
+						current_ratio = face_uv_perimeter/face_perimeter
+						unit = bpy.context.scene.unit_settings.scale_length
+						uv_scale_coef = unit * 50
+						if current_ratio > 0:
+							s = uv_scale_coef/current_ratio
+							bpy.ops.object.mode_set(mode = 'OBJECT')
 
-					if current_ratio > 0:
-						s = 0.5/current_ratio
-						bpy.ops.object.mode_set(mode = 'OBJECT')
-
-						#scale UVs
-						map_name = obj.data.uv_layers.keys()
-						uv_map = obj.data.uv_layers[map_name[0]]
-						self.uv_scale(uv_layer, uv_map, (s, s))
+							#scale UVs
+							map_name = obj.data.uv_layers.keys()
+							uv_map = obj.data.uv_layers[map_name[0]]
+							self.uv_scale(uv_layer, uv_map, (s, s))
+						else:
+							self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
 					else:
-						self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
+						self.report({'WARNING'},  "UVs cannot be scaled! Incorrect UVs")
 				else:
-					self.report({'WARNING'},  "UVs cannot be scaled! Incorrect UVs")
+					self.report({'WARNING'},  "Selection update is required. Select UVs manually in the UV Editor.")
 			else:
-				self.report({'WARNING'},  "No Vertex Selection!")
+				self.report({'WARNING'},  "UVMap not found!")
+			bpy.ops.object.mode_set(mode = 'OBJECT')
+			bpy.ops.object.select_all(action='DESELECT')		
+		
+		for o in sel:
+			o.select_set(True)
+		bpy.ops.object.mode_set(mode = 'EDIT')
 
-			bpy.ops.object.mode_set(mode = 'EDIT')
-		else:
-			self.report({'WARNING'},  "UVMap not found!")
 		return {'FINISHED'}
 
 class ObjectFixName(Operator):	
@@ -1523,12 +1558,15 @@ class VertexPaintrFill(Operator):
 	
 	@classmethod
 	def poll(cls, context):
-		return context.active_object
+		return context.active_object and context.mode == 'EDIT_MESH'
 
 	def _fill_polygon_(self, obj, replace_with):
 		obj.use_paint_mask = True
+		if bpy.context.tool_settings.vertex_paint.brush != bpy.data.brushes['Draw']:
+			bpy.context.tool_settings.vertex_paint.brush = bpy.data.brushes['Draw']
 		bpy.data.brushes['Draw'].color = replace_with[:3]
 		bpy.ops.paint.vertex_color_set()
+
 	
 	def replace_vertex_color(self, context):
 		sel = [obj for obj in bpy.context.selected_objects if obj.type != "EMPTY"]

@@ -250,9 +250,9 @@ class BodyExport(Operator):
 								# check the export flag
 								if bpy.context.scene.export_flag:
 									if name:
-										if file_path:
-											if os.access(file, os.W_OK) or os.access(file, os.F_OK):
-												os.chmod(file, 0o744)
+										if file_path:											
+											if os.access(full_name, os.W_OK) or os.access(full_name, os.F_OK):
+												os.chmod(full_name, 0o744)
 											if bpy.context.scene.debug_mode == False:
 												self.exp(name, file_path)
 												self.report({'INFO'}, full_name)			
@@ -469,8 +469,8 @@ class RimExport(Operator):
 				#export
 				if bpy.context.scene.debug_mode == False:
 					if file_path:
-						if os.access(file, os.W_OK) or os.access(file, os.F_OK):
-							os.chmod(file, 0o744)
+						if os.access(full_name, os.W_OK) or os.access(full_name, os.F_OK):
+							os.chmod(full_name, 0o744)
 						if complex_rim is not None:
 							complex_rim.select_set(True)
 							bpy.context.view_layer.objects.active = complex_rim
@@ -655,8 +655,8 @@ class FixturesExport(Operator):
 											bpy.context.view_layer.objects.active = fixture_copy
 					
 										if file_path:
-											if os.access(file, os.W_OK) or os.access(file, os.F_OK):
-												os.chmod(file, 0o744)
+											if os.access(full_name, os.W_OK) or os.access(full_name, os.F_OK):
+												os.chmod(full_name, 0o744)
 											if complex_fixture is not None:
 												complex_fixture.select_set(True)								
 												bpy.context.view_layer.objects.active = complex_fixture
