@@ -3,7 +3,6 @@ import math
 import webbrowser
 from bpy.props import *
 
-
 bl_info = {
     "name": "Automation Rim Generator",
     "description": "Automation Rim Generator",
@@ -18,7 +17,7 @@ class AddRim(bpy.types.Operator):
     """Opens a web browser to the specified help page on github"""
     bl_idname = "object.rim_generator_add_mesh"
     bl_label = "Automation Tools Rim Mesh Adder"
-    bl_options = {'REGISTER', 'UNDO'}  
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         url = 'https://github.com/AutomationStaff/AutomationTools/wiki/Generators#rim-generator-tool'
@@ -31,12 +30,12 @@ class CreateRim(bpy.types.Operator):
     bl_idname = "object.rim_generator"
     bl_label = "Automation Tools Rim Creator"
     bl_options = {'REGISTER', 'UNDO'}
-        
+
     # ----------------------------------------------------------------------------------
 
     # TODO: 1: Replace Empties with custom circular object that communicates better what's going on than the empty does.
     # TODO: 2: Fix LERP Functionality
-    
+
     # ----------------------------------------------------------------------------------
 
     # Variable meant to be used globally as a counter to track vertex index as geometry is drawn.
@@ -46,14 +45,23 @@ class CreateRim(bpy.types.Operator):
 
     )
 
+    INDEX_T: IntProperty(
+        options={'HIDDEN'},
+        default=0,
+
+    )
+
     # Other fixed global variables that define rim dimensions and material colors.
-    HUB_X = -.043
+    HUB_X = -0.043
     HUB_Y = 0.0
-    HUB_Z = .0588
-    HUB_X_BACK = .028
-    RIM_X = -.04434
-    RIM_X_BACK = .0129
-    RIM_Z = .13
+    HUB_Z = 0.0588
+    HUB_X_BACK = 0.028
+    RIM_X = -0.04434
+    RIM_X_BACK = 0.0129
+    RIM_X_TEMPLATE_FRONT = -0.15504
+    RIM_X_TEMPLATE_BACK = -0.099833
+    RIM_Z = 0.13
+    RIM_Z_TEMPLATE = 0.36855
     MATERIAL_INDEX_ORDER = [2, 0, 1, 3, 1]
     MAT_COLORS = [
         (0.393, 0.393, 0.393, 1.0),  # Index 0, Color 1
@@ -80,7 +88,9 @@ class CreateRim(bpy.types.Operator):
         self.collection_already_exists = False
 
     def rim_geometry_generator(self, spin, pos_x, pos_y, pos_z, bool_faces, bool_append, verts, faces):
-        """Draws one pass of quad geometry"""
+        """Draws one pass of quad geometry, takes spin, x, y and z positions for a single vertex, will work out where
+        to place the rest of them, bool for whether or not to draw faces, bool for something else :P, the verts and
+        faces lists."""
         verts.append(  # Index n
             [  # List
                 pos_x,
@@ -88,10 +98,10 @@ class CreateRim(bpy.types.Operator):
                 pos_z
             ]
         )
-         
+
         self.INDEX = self.INDEX + 1
         for index in range(self.subs):
-            new_spin = spin/self.subs
+            new_spin = spin / self.subs
             new_index = index + 1
             angle = math.radians(new_spin * new_index)
             new_pos_y = math.sin(angle) * pos_z
@@ -178,7 +188,7 @@ class CreateRim(bpy.types.Operator):
         obj = bpy.context.object
         bops = bpy.ops
         mesh = obj.data
-        
+
         for i in range(start, stop):
             mesh.vertices[i].select = True
 
@@ -190,7 +200,7 @@ class CreateRim(bpy.types.Operator):
             bpy.context.object.active_material.diffuse_color = colors[mat_index]
 
         self.deselect_all()
-            
+
     @staticmethod
     def smooth(self, start, stop):
         """Smooths selected faces"""
@@ -213,13 +223,13 @@ class CreateRim(bpy.types.Operator):
     def check_add_materials(self, new_mesh, colors):
         """Checks the blend file to see if materials for the rim exist, and if not, adds them."""
         mat_names = [
-                   'Wheel_Primary',  # Index 0
-                   'Wheel_Secondary',  # Index 1
-                   'Wheel_Misc1',  # Index 2
-                   'Wheel_Misc2',  # Index 3
-                   'Wheel_Nuts_Misc3',  # Index 4
+            'Wheel_Primary',  # Index 0
+            'Wheel_Secondary',  # Index 1
+            'Wheel_Misc1',  # Index 2
+            'Wheel_Misc2',  # Index 3
+            'Wheel_Nuts_Misc3',  # Index 4
 
-               ]
+        ]
 
         materials = []
 
@@ -655,8 +665,8 @@ class CreateRim(bpy.types.Operator):
             TRANSFORM_OT_translate={"value": (0, 0, 0.00168543),
                                     "orient_type": 'NORMAL',
                                     "orient_matrix": (
-                                    (2.36401e-06, 0.707107, 0.707106), (-2.19138e-06, 0.707106, -0.707107),
-                                    (-1, 1.22077e-07, 3.22115e-06)),
+                                        (2.36401e-06, 0.707107, 0.707106), (-2.19138e-06, 0.707106, -0.707107),
+                                        (-1, 1.22077e-07, 3.22115e-06)),
                                     "orient_matrix_type": 'NORMAL', "constraint_axis": (False, False, True),
                                     "mirror": False,
                                     "use_proportional_edit": False,
@@ -684,8 +694,8 @@ class CreateRim(bpy.types.Operator):
             TRANSFORM_OT_translate={"value": (0, 0, 0.00174559),
                                     "orient_type": 'NORMAL',
                                     "orient_matrix": (
-                                    (2.10505e-06, 0.707107, 0.707106), (-2.45034e-06, 0.707106, -0.707107),
-                                    (-1, -2.44153e-07, 3.22114e-06)),
+                                        (2.10505e-06, 0.707107, 0.707106), (-2.45034e-06, 0.707106, -0.707107),
+                                        (-1, -2.44153e-07, 3.22114e-06)),
                                     "orient_matrix_type": 'NORMAL',
                                     "constraint_axis": (False, False, True),
                                     "mirror": False,
@@ -727,8 +737,8 @@ class CreateRim(bpy.types.Operator):
             TRANSFORM_OT_translate={"value": (0, 0, 0.00151651),
                                     "orient_type": 'NORMAL',
                                     "orient_matrix": (
-                                    (3.20965e-06, 0.707107, 0.707107), (-2.64024e-06, 0.707107, -0.707107),
-                                    (-1, 4.02631e-07, 4.1365e-06)),
+                                        (3.20965e-06, 0.707107, 0.707107), (-2.64024e-06, 0.707107, -0.707107),
+                                        (-1, 4.02631e-07, 4.1365e-06)),
                                     "orient_matrix_type": 'NORMAL',
                                     "constraint_axis": (False, False, True),
                                     "mirror": False,
@@ -805,6 +815,176 @@ class CreateRim(bpy.types.Operator):
         yield t
         for child in t.children:
             yield from self.traverse_tree(child)
+
+    def template_geometry_generator(self, total_circle_verts, spin, pos_x, pos_y, pos_z, bool_faces, bool_append, verts,
+                                    faces):
+        """Draws one pass of quad geometry, takes spin, x, y and z positions for a single vertex, will work out where
+        to place the rest of them, bool for whether or not to draw faces, bool for something else :P, the verts and
+        faces lists."""
+        verts.append(  # Index n
+            [  # List
+                pos_x,
+                pos_y,
+                pos_z
+            ]
+        )
+
+        self.INDEX_T += 1
+        for index in range(total_circle_verts):
+            new_spin = spin / self.subs
+            new_index = index + 1
+            angle = math.radians(new_spin * new_index)
+            new_pos_y = math.sin(angle) * pos_z
+            new_pos_z = math.cos(angle) * pos_z
+            verts.append(
+                [
+                    pos_x,
+                    new_pos_y,
+                    new_pos_z
+                ]
+            )
+            if bool_append:
+                if bool_faces:
+                    faces.append(
+                        [  # Works out which verts to append to create faces
+                            self.INDEX_T + total_circle_verts + 1,
+                            self.INDEX_T + total_circle_verts,
+                            self.INDEX_T - 1,
+                            self.INDEX_T
+                        ]
+                    )
+                self.INDEX_T += 1
+            else:
+                self.INDEX_T += 1
+
+    def add_custom_template(self, spin):
+        # Variables
+        verts_t, edges_t, faces_t = [], [], []
+        total_verts_in_circle = self.subs * self.array_elements * 2
+
+        self.set_object_mode()
+        # Place first vertex and begin building the mesh
+        # Places vert index 0 at the center hub vert, this is fixed and unchanging.
+        verts_t.append([  # Index 0
+            self.HUB_X,
+            0.0,
+            0.0
+        ])
+        self.INDEX_T = 0
+
+        # verts_t.append([.1, .1, .1])
+
+        # Builds initial triangular geometry.
+        verts_t.append(
+            [  # index 1
+                self.HUB_X,
+                self.HUB_Y,
+                self.HUB_Z,
+
+            ]
+        )
+        self.INDEX_T += 1
+
+        for index in range(total_verts_in_circle):
+            index_y = index + 1
+            index_z = index_y + 1
+            new_spin = (spin / self.subs)
+            verts_t.append(
+                [
+                    self.HUB_X,
+                    math.sin(math.radians(new_spin * (index + 1))) * self.HUB_Z,
+                    math.cos(math.radians(new_spin * (index + 1))) * self.HUB_Z
+                ]
+            )
+            self.INDEX = self.INDEX + 1
+            faces_t.append([0, index_y, index_z])
+
+        # Quad Geometry function calls
+        self.template_geometry_generator(
+            total_verts_in_circle,
+            spin,
+            self.HUB_X + .071045,
+            self.HUB_Y,
+            self.HUB_Z,
+            True,
+            True,
+            verts_t,
+            faces_t
+        )
+        self.template_geometry_generator(
+            total_verts_in_circle,
+            spin,
+            self.RIM_X,
+            self.HUB_Y,
+            self.RIM_Z,
+            False,
+            True,
+            verts_t,
+            faces_t
+        )
+        self.template_geometry_generator(
+            total_verts_in_circle,
+            spin,
+            self.RIM_X_BACK,
+            self.HUB_Y,
+            self.RIM_Z,
+            True,
+            True,
+            verts_t,
+            faces_t
+        )
+        self.template_geometry_generator(
+            total_verts_in_circle,
+            spin,
+            self.RIM_X_TEMPLATE_FRONT,
+            self.HUB_Y,
+            self.RIM_Z,
+            False,
+            True,
+            verts_t,
+            faces_t
+        )
+        self.template_geometry_generator(
+            total_verts_in_circle,
+            spin,
+            self.RIM_X_TEMPLATE_BACK,
+            self.HUB_Y,
+            self.RIM_Z,
+            True,
+            True,
+            verts_t,
+            faces_t
+        )
+        self.template_geometry_generator(
+            total_verts_in_circle,
+            spin,
+            self.RIM_X,
+            self.HUB_Y,
+            self.RIM_Z_TEMPLATE,
+            False,
+            True,
+            verts_t,
+            faces_t
+        )
+        self.template_geometry_generator(
+            total_verts_in_circle,
+            spin,
+            self.RIM_X_BACK,
+            self.HUB_Y,
+            self.RIM_Z_TEMPLATE,
+            True,
+            True,
+            verts_t,
+            faces_t
+        )
+
+        name_t = "Automation Rim Template"  # Create rim template name
+        mesh_t = bpy.data.meshes.new(name_t)  # Create rim template mesh
+        obj_t = bpy.data.objects.new(name_t, mesh_t)  # Create rim template object
+
+        col = bpy.context.collection
+        col.objects.link(obj_t)
+        mesh_t.from_pydata(verts_t, edges_t, faces_t)  # Creates actual geometry
 
     wire: BoolProperty(
         name="Wireframe",
@@ -930,8 +1110,14 @@ class CreateRim(bpy.types.Operator):
     )
     new_collection: BoolProperty(
         name="Add to new Collection",
-        description="Sdd to a new collection in your selected collection, or add to selected collection directly.",
+        description="Add to a new collection in your selected collection, or add to selected collection directly.",
         default=True,
+
+    )
+    add_template: BoolProperty(
+        name="Add Custom Template?",
+        description="Adds a rim template based on your mesh density so when scaling later, the edges align.",
+        default=False,
 
     )
 
@@ -994,9 +1180,15 @@ class CreateRim(bpy.types.Operator):
         rim_bevel_limit = 'WEIGHT'
         rim_bevel = self.add_bevel_modifier(obj, rim_bevel_amount, rim_bevel_limit, 0)  # Adds Bevel modifier, returns
         self.add_tri_modifier(obj)  # Adds Triangulate modifiers
-        
+
         # ----------------------------------------------------------------------------------
-            
+
+        # Adds custom wheel template.
+        if self.add_template:
+            self.add_custom_template(spin)
+
+        # ----------------------------------------------------------------------------------
+
         # Build Lug nut from empty cylinder primitive
         if self.lugs:
             self.empty_nut = self.spawn_nut_empty(spin_nut)  # Creates lug nut empty (method call)
@@ -1013,14 +1205,14 @@ class CreateRim(bpy.types.Operator):
         elif not self.lugs:
             print("lug nuts off")
             # We likely can remove this elif statement if it's not needed for other functions later.
-        
+
         # ----------------------------------------------------------------------------------
 
         # Menu visibility toggles
         bpy.context.space_data.overlay.show_wireframes = self.wire
         mod_array.show_viewport = self.array_visibility
         mod_mirror.show_viewport = self.mirror_visibility
-                    
+
         return {'FINISHED'}
 
 
