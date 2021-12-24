@@ -130,9 +130,34 @@ class UVToolsPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
+		
+		column.label(text="UV Seams")
 		column.operator(UVSeamsFromHardEdges.bl_idname, text = "Hard edges > UV Seams")
+		column.operator(UnwrapCylinder.bl_idname, text = "Cylinder")
+		
+		column.label(text="Unwrap")
 		column.operator(CreateUVs.bl_idname, text = "Unwrap")
-		column.operator(ScaleUVs.bl_idname, text = "Scale")
+
+		#column.operator(UnwrapCylinder.bl_idname, text = "Pipe")
+		column.prop(bpy.context.scene, "texel_value", text = 'Texel Density:')
+		column.operator(ScaleUVs.bl_idname, text = "Get").command = "GET"
+		column.operator(ScaleUVs.bl_idname, text = "Set").command = "SET"
+		
+		column.label(text="UV Checker")
+		column.operator(CreateUVChecker.bl_idname, text = "Add")
+		split = column.split(factor=0.5, align=True)
+		split.operator(ToggleUVChecker.bl_idname, text = "Show").action = False
+		split.operator(ToggleUVChecker.bl_idname, text = "Hide").action = True
+		column.prop(bpy.context.scene, 'checker_scale', text = "Scale")
+		
+		column.label(text="Transform")
+		split = column.split(factor=0.5, align=True)
+		split.operator(UVRotate.bl_idname, text = "Rotate +90").angle = 1.5708
+		split.operator(UVRotate.bl_idname, text = "Rotate -90").angle = -1.5708
+		
+		split = column.split(factor=0.5, align=True)
+		split.operator(UVMirror.bl_idname, text = "Mirror X").axis = (True, False, False)
+		split.operator(UVMirror.bl_idname, text = "Mirror Y").axis = (False, True, False)
 
 class GeometryPanel(Panel):
 	bl_label = "Geometry"
@@ -185,8 +210,9 @@ class RimGeneratorPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
-		column.operator("OBJECT_OT_rim_generator", text = "New Rim Project")
-		column.operator("object.add_bevel_width_driver", text = 'Lerp Bevel Width')
+		column.operator("OBJECT_OT_rim_generator", text = "New Rim Project", icon = 'ADD')
+		column.operator("object.add_bevel_width_driver", text = 'Lerp Bevel Width', icon = 'MOD_BEVEL')
+		column.operator("object.add_empty_shape_keys", text = "Add Empty Shape Keys", icon = 'SHAPEKEY_DATA').type = 'RIM'		
 		column.separator()
 		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = "rim_generator"
 
@@ -201,12 +227,29 @@ class MaterialsCleanupPanel(Panel):
 	
 	def draw(self, context):
 		layout = self.layout
-		column = layout.column(align=True) 
-		column.operator("object.cleanup_unused_mesh_mats", text = "Mesh Unused")
-		column.operator("object.delete_all_mesh_mats", text = "Mesh All")		
-		column.operator("object.cleanup_mats_scene_unused", text = "Scene Unused")
-		column.operator("object.cleanup_mats_scene_all", text = "Scene All")
-		column.operator("object.sort_mesh_materials", text = "Sort")
+		column = layout.column(align=True)
+
+		column.label(text = 'Mesh')
+		column.operator("object.cleanup_unused_mesh_mats", text = "Unused")
+		column.operator("object.delete_all_mesh_mats", text = "All")
+
+		column.label(text = 'Scene')
+		column.operator("object.cleanup_mats_scene_unused", text = "Unused")
+		column.operator("object.cleanup_mats_scene_all", text = "All")
+
+		column.label(text = 'Replace')
+
+		split = column.split(factor=0.8, align=True)
+		split.prop(bpy.context.scene, 'src_mat', text = 'Source')
+		split.operator(ReplaceMaterialsGetter.bl_idname, text = "Get").mat = 'src'
+		split.operator(ReplaceMaterialsAdder.bl_idname, text = "Add").mat = 'add_src'
+
+		split = column.split(factor=0.8, align=True)
+		split.prop(bpy.context.scene, 'trg_mat', text = 'Target')
+		split.operator(ReplaceMaterialsGetter.bl_idname, text = "Get").mat = 'trg'
+		split.operator(ReplaceMaterialsAdder.bl_idname, text = "Add").mat = 'add_trg'
+
+		column.operator(ReplaceMaterials.bl_idname, text = "Apply")
 
 class NamingPanel(Panel):
 	bl_label = "Naming"
@@ -250,7 +293,8 @@ class HierarchyPanel(Panel):
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Body").type = 'Body'
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Rim").type = 'Rim'
 		column.operator("OBJECT_OT_generate_hierarchy", text = "Fixture").type = 'Fixture'
-		column.operator("object.create_group", text = "Create Group")
+		column.operator("object.create_group", text = "Group")
+		column.operator(CreateCollection.bl_idname, text = "Collection")
 
 class SocketsPanel(Panel):
 	bl_label = "Sockets"

@@ -1,5 +1,5 @@
-
 import bpy
+import os
 from bpy.utils import register_class, unregister_class
 from bpy.types import Operator, Panel, Menu
 import bmesh
@@ -29,7 +29,7 @@ class CopyApplyModifier (Operator):
 					if mod == 'SHRINKWRAP' and m.show_viewport:
 						name = m.name
 						o.modifier_copy(modifier= name)
-						o.modifier_apply(modifier= name)
+						o.modifier_apply(modifier= obj.modifiers.active.name)
 
 						# check result
 						if name not in obj.modifiers[:]:
@@ -687,16 +687,28 @@ class UVSeamsFromHardEdges(Operator):
 		obj = bpy.context.object
 		bm = bmesh.from_edit_mesh(obj.data)
 		#get selection
-		sel = [f for f in bm.faces if f.select]
+		sel = [f for f in bm.edges if f.select]
+		faces = [f for f in bm.faces if f.select]
+		edges = []
+		if sel:
+		   edges = sel
+		else:
+			edges = bm.edges
+
 		bpy.ops.mesh.select_all(action='DESELECT')
-		edges = [e for e in bm.edges if e.smooth == False]
-		for i in edges:
+		hard_edges = [e for e in edges if e.smooth == False]
+		for i in hard_edges:
 			i.select_set(True)
 		bpy.ops.mesh.mark_seam(clear=False)
-		for i in edges:
+
+		for i in hard_edges:
 			i.select_set(False)
-		for f in sel:
-			f.select_set(True)
+		for e in edges:
+			e.select_set(False)
+
+		if len(faces) > 0:
+			for f in faces:
+				f.select_set(True)
 		return {'FINISHED'}
 
 class CreateUVs(Operator):
@@ -718,18 +730,19 @@ class CreateUVs(Operator):
 		bpy.ops.object.select_all(action='DESELECT')
 		
 		for obj in sel:
-			obj.select_set(True)
-			bpy.context.view_layer.objects.active = obj
-			bpy.ops.object.mode_set(mode = 'EDIT')
-			#if len(obj.data.uv_layers) > 0:
-			#	map_name = obj.data.uv_layers.keys()
-			#	uv_map = obj.data.uv_layers[map_name[0]]
-			#bpy.ops.uv.select_all(action='SELECT')
-			bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-			#bpy.ops.mesh.scale_uvs()
+			if obj.type == "MESH":
+				obj.select_set(True)
+				bpy.context.view_layer.objects.active = obj
+				bpy.ops.object.mode_set(mode = 'EDIT')
+				#if len(obj.data.uv_layers) > 0:
+				#	map_name = obj.data.uv_layers.keys()
+				#	uv_map = obj.data.uv_layers[map_name[0]]
+				#bpy.ops.uv.select_all(action='SELECT')
+				bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001, correct_aspect = False)
+				bpy.ops.mesh.scale_uvs(command='SET')
 			
-			bpy.ops.object.mode_set(mode = 'OBJECT')
-			bpy.ops.object.select_all(action='DESELECT')
+				bpy.ops.object.mode_set(mode = 'OBJECT')
+				bpy.ops.object.select_all(action='DESELECT')
 
 		for o in sel:
 			o.select_set(True)
@@ -742,7 +755,7 @@ class ScaleUVs(Operator):
 	bl_idname = "mesh.scale_uvs"
 	bl_options = {'REGISTER', 'UNDO'}
 	bl_description = "Scale Selected UVs: 1 cm = 128x128 pix"
-
+	command: bpy.props.StringProperty(options = {'HIDDEN'})
 	@classmethod
 	def poll(cls, context):
 		return context.object is not None and context.mode == "EDIT_MESH"
@@ -757,9 +770,6 @@ class ScaleUVs(Operator):
 		bm.select_flush_mode()
 		bmesh.update_edit_mesh(obj.data)
 		uv_layer = bm.loops.layers.uv.active
-
-		if bpy.context.scene.tool_settings.use_uv_select_sync:
-			bpy.context.scene.tool_settings.use_uv_select_sync = False
 		
 		#get selected uvs and coordinates
 		selected_uv_verts = []
@@ -767,7 +777,7 @@ class ScaleUVs(Operator):
 		for v in bm.verts:
 			for loop in v.link_loops:		
 				uv_data = loop[uv_layer]
-				if uv_data.select:
+				if uv_data.select and uv_data.pin_uv == False:
 					selected_uv_verts.append(uv_data)
 					coordinates.append(uv_data.uv)
 
@@ -781,16 +791,11 @@ class ScaleUVs(Operator):
 		else:
 			pivot = ((0.5, 0.5))
 
-		#print (pivot[0], pivot[1])
-		#print (len(coordinates))
-		#print (selected_uv_verts)
-
 		for uv in selected_uv_verts:
 			uv.uv = self.scale_XY(uv.uv, scale, pivot)
 
 	def uv_from_vert_first(self, uv_layer, v, f):
 		for loop in v.link_loops:
-			#print (v.index)
 			if loop.face == f:				
 				uv_data = loop[uv_layer]
 				#print ("Filtered face index: ", v.index)
@@ -805,90 +810,416 @@ class ScaleUVs(Operator):
 		perimeter = (l1 + l2 + l3)
 		return perimeter
 
-	def execute(self, context):
-		sel = bpy.context.selected_objects
+	def get_current_ratio(self, obj):		
 		bpy.ops.object.mode_set(mode = 'OBJECT')
-		bpy.ops.object.select_all(action='DESELECT')
+		bpy.ops.object.select_all(action='DESELECT')		
+		
+		obj.select_set(True)
+		bpy.context.view_layer.objects.active = obj
+		bpy.ops.object.mode_set(mode = 'EDIT')
+
+		#obj = context.object		
+		if len(obj.data.uv_layers.keys()) > 0:
+			bm = bmesh.from_edit_mesh(obj.data)
+			bpy.ops.uv.average_islands_scale()
+
+			uv_layer = bm.loops.layers.uv.active
+
+			uv_face_list = []
+			for f in bm.faces:
+				for loop in f.loops:		
+					uv_data = loop[uv_layer]
+					if uv_data.select:
+						uv_face_list.append(loop.face)
+			
+			if len(uv_face_list):
+				#print(uv_face.index)
+
+				#faces = [f for f in bm.faces]
+				# get the biggest face
+				areas = [f.calc_area() for f in uv_face_list]			
+			
+				max_val = max(areas)
+				ind =  areas.index(max_val)
+
+				f = uv_face_list[ind]
+
+				#print("Face: ", f.index)
+
+				verts = [v for v in f.verts]
+
+				verts = verts[:3]
+				face_perimeter = self.get_triangle_perimeter(verts) 
+
+				coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
+				coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
+				coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
+
+				#loops
+				v0 = [loop for loop in (verts[0].link_loops[:])]
+				v1 = [loop for loop in (verts[1].link_loops[:])]
+				v2 = [loop for loop in (verts[2].link_loops[:])]
+
+				uv_edge_length_1 = (coord1 - coord2).length
+				uv_edge_length_2 = (coord2 - coord3).length
+				uv_edge_length_3 = (coord1 - coord3).length
+
+				face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
+
+				if face_uv_perimeter and face_perimeter > 0:
+					current_ratio = face_uv_perimeter/face_perimeter
+					return (current_ratio, uv_layer)				
+				else:
+					self.report({'WARNING'},  "Texel cannot be measured! Check UV zero values")
+					return None
+			else:
+				self.report({'WARNING'},  "Selection update is required. Select UVs manually in the UV Editor.")
+		else:
+			self.report({'WARNING'},  "UVMap not found!")
+
+	def execute(self, context):		
+		if_sync = False
+		if bpy.context.scene.tool_settings.use_uv_select_sync:
+			if_sync = True
+			bpy.ops.uv.pin(clear=False)
+			bpy.context.scene.tool_settings.use_uv_select_sync = False		
+			bpy.ops.uv.select_pinned()			
+			bpy.ops.uv.pin(clear=True)
+
+		sel = bpy.context.selected_objects
+		#bpy.ops.object.mode_set(mode = 'OBJECT')
+		#bpy.ops.object.select_all(action='DESELECT')
 		
 		for obj in sel:
-			obj.select_set(True)
-			bpy.context.view_layer.objects.active = obj
-			bpy.ops.object.mode_set(mode = 'EDIT')
+			if self.command == "SET":
+				ratio_uvlayer = self.get_current_ratio(obj)
+				if ratio_uvlayer is not None:
+					current_ratio = ratio_uvlayer[0]
+					texel = bpy.context.scene.texel_value
+					#ratio_coef = texel/current_ratio
+					uv_layer = ratio_uvlayer[1]
+					#unit = bpy.context.scene.unit_settings.scale_length
+					#uv_scale_coef = unit * 100
+					if current_ratio > 0:
+						s = texel/current_ratio
+						bpy.ops.object.mode_set(mode = 'OBJECT')
 
-			#obj = context.object		
-			if len(obj.data.uv_layers.keys()) > 0:
-				bm = bmesh.from_edit_mesh(obj.data)
-				bpy.ops.uv.average_islands_scale()
+						#scale UVs
+						map_name = obj.data.uv_layers.keys()
+						uv_map = obj.data.uv_layers[map_name[0]]
+						self.uv_scale(uv_layer, uv_map, (s, s))
 
-				uv_layer = bm.loops.layers.uv.active
+						bpy.ops.object.mode_set(mode = 'OBJECT')
+						bpy.ops.object.select_all(action='DESELECT')
 
-				uv_face_list = []
-				for f in bm.faces:
-					for loop in f.loops:		
-						uv_data = loop[uv_layer]
-						if uv_data.select:
-							uv_face_list.append(loop.face)
-			
-				if len(uv_face_list):
-					#print(uv_face.index)
-
-					#faces = [f for f in bm.faces]
-					# get the biggest face
-					areas = [f.calc_area() for f in uv_face_list]			
-			
-					max_val = max(areas)
-					ind =  areas.index(max_val)
-
-					f = uv_face_list[ind]
-
-					#print("Face: ", f.index)
-
-					verts = [v for v in f.verts]
-
-					verts = verts[:3]
-					face_perimeter = self.get_triangle_perimeter(verts) 
-
-					coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
-					coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
-					coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
-
-					#loops
-					v0 = [loop for loop in (verts[0].link_loops[:])]
-					v1 = [loop for loop in (verts[1].link_loops[:])]
-					v2 = [loop for loop in (verts[2].link_loops[:])]
-
-					uv_edge_length_1 = (coord1 - coord2).length
-					uv_edge_length_2 = (coord2 - coord3).length
-					uv_edge_length_3 = (coord1 - coord3).length
-
-					face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
-
-					if face_uv_perimeter and face_perimeter > 0:
-						current_ratio = face_uv_perimeter/face_perimeter
-						unit = bpy.context.scene.unit_settings.scale_length
-						uv_scale_coef = unit * 50
-						if current_ratio > 0:
-							s = uv_scale_coef/current_ratio
-							bpy.ops.object.mode_set(mode = 'OBJECT')
-
-							#scale UVs
-							map_name = obj.data.uv_layers.keys()
-							uv_map = obj.data.uv_layers[map_name[0]]
-							self.uv_scale(uv_layer, uv_map, (s, s))
-						else:
-							self.report({'WARNING'},  "UVs cannot be scaled! Check UV zero values")
-					else:
-						self.report({'WARNING'},  "UVs cannot be scaled! Incorrect UVs")
-				else:
-					self.report({'WARNING'},  "Selection update is required. Select UVs manually in the UV Editor.")
-			else:
-				self.report({'WARNING'},  "UVMap not found!")
-			bpy.ops.object.mode_set(mode = 'OBJECT')
-			bpy.ops.object.select_all(action='DESELECT')		
+			elif self.command == "GET":
+				if self.get_current_ratio(obj) is not None:
+					bpy.context.scene.texel_value = self.get_current_ratio(obj)[0]
+		
+		#cleanup
 		
 		for o in sel:
 			o.select_set(True)
 		bpy.ops.object.mode_set(mode = 'EDIT')
+
+		bpy.ops.uv.select_all(action='DESELECT')	
+
+		if if_sync == True:
+			bpy.context.scene.tool_settings.use_uv_select_sync = True
+
+		return {'FINISHED'}
+
+class UnwrapCylinder(Operator):
+	bl_idname = "mesh.unwrap_cylinder"
+	bl_label = "Unwrap Cylinder"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Unwrap Cylinder"
+	angle_1 : bpy.props.FloatProperty(default = 0.5, min = 0.0, max = 3.14159 )
+	angle_2 : bpy.props.FloatProperty(default = 1.5, min = 0.0, max = 3.14159)
+	angle_3 : bpy.props.FloatProperty(default = 1.57, min = 0.0, max = 3.14159)
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and context.mode == "EDIT_MESH"
+
+	def execute(self, context):
+		
+		angle_1 = self.angle_1
+		angle_2 = self.angle_2
+		angle_3 = self.angle_3
+		
+		obj = bpy.context.object
+		bm = bmesh.from_edit_mesh(obj.data)		
+		
+		verts = [v for v in bm.verts if v.select]
+		#print (verts)
+		bpy.ops.mesh.select_all(action='DESELECT')
+
+		#find a 90deg angle between edges
+		angles = {}
+		for v in verts:
+			edges = v.link_edges
+			for e in edges:
+				#e.select_set(True)
+				#print (e.calc_face_angle())
+				angles[e.index] = e.calc_face_angle(None)	
+		#print (angles)
+
+		#get non-90 deg edge for a seam
+		for ind, ang in angles.items():
+			if ang != None:
+				if angle_1 < ang < angle_3:
+					bm.edges.ensure_lookup_table()
+					bm.edges[ind].select_set(True)
+					break
+		#get caps
+		for ind, ang in angles.items():
+			if ang != None:
+				if ang > angle_2:
+					bm.edges.ensure_lookup_table()
+					bm.edges[ind].select_set(True)
+					
+		
+		bpy.ops.mesh.mark_seam(clear=False)
+
+		bm.select_flush_mode()
+		bmesh.update_edit_mesh(obj.data)
+
+		bm.select_mode = {"EDGE"}
+
+		bpy.ops.mesh.loop_multi_select(ring=False)
+		bpy.ops.mesh.mark_seam(clear=False)
+		
+		bm.select_mode = {"VERT"}
+		for v in verts:
+			v.select_set(True)
+		
+		bm.select_flush_mode()
+		bmesh.update_edit_mesh(obj.data)
+
+		#bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
+
+		#if bpy.context.scene.tool_settings.use_uv_select_sync == False:
+		#	bpy.context.scene.tool_settings.use_uv_select_sync = True
+		
+		#sel = bpy.context.selected_objects
+		#bpy.ops.object.mode_set(mode = 'OBJECT')
+		#bpy.ops.object.select_all(action='DESELECT')
+		
+		#for obj in sel:
+		#	if obj.type == "MESH":
+		#		obj.select_set(True)
+		#		bpy.context.view_layer.objects.active = obj
+		#		bpy.ops.object.mode_set(mode = 'EDIT')
+		#		#if len(obj.data.uv_layers) > 0:
+		#		#	map_name = obj.data.uv_layers.keys()
+		#		#	uv_map = obj.data.uv_layers[map_name[0]]
+		#		#bpy.ops.uv.select_all(action='SELECT')
+		#		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
+		#		#bpy.ops.mesh.scale_uvs()
+			
+		#		bpy.ops.object.mode_set(mode = 'OBJECT')
+		#		bpy.ops.object.select_all(action='DESELECT')
+
+		#for o in sel:
+		#	o.select_set(True)
+		#bpy.ops.object.mode_set(mode = 'EDIT')
+
+		return {'FINISHED'}
+
+class UnwrapPipe(Operator):
+	bl_idname = "mesh.unwrap_pipe"
+	bl_label = "Unwrap Pipe"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Unwrap Pipe"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and context.mode == "EDIT_MESH"
+
+	def execute(self, context):		
+		bpy.ops.mesh.select_all(action='DESELECT')
+		obj = bpy.context.object
+		bm = bmesh.from_edit_mesh(obj.data)
+		
+		bm.verts.ensure_lookup_table()
+		v = bm.verts[0]
+		
+		edges = v.link_edges
+		for e in edges:
+			e.select_set(True)		
+
+		bm.select_flush_mode()
+		bmesh.update_edit_mesh(obj.data)
+
+		bm.select_mode = {"EDGE"}
+
+		bpy.ops.mesh.loop_multi_select(ring=False)
+		bpy.ops.mesh.mark_seam(clear=False)
+
+		bpy.ops.mesh.uv_seams_from_hard_edges()
+
+		bpy.ops.mesh.select_all(action='SELECT')
+		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
+
+
+		#if bpy.context.scene.tool_settings.use_uv_select_sync == False:
+		#	bpy.context.scene.tool_settings.use_uv_select_sync = True
+		
+		#sel = bpy.context.selected_objects
+		#bpy.ops.object.mode_set(mode = 'OBJECT')
+		#bpy.ops.object.select_all(action='DESELECT')
+		
+		#for obj in sel:
+		#	if obj.type == "MESH":
+		#		obj.select_set(True)
+		#		bpy.context.view_layer.objects.active = obj
+		#		bpy.ops.object.mode_set(mode = 'EDIT')
+		#		#if len(obj.data.uv_layers) > 0:
+		#		#	map_name = obj.data.uv_layers.keys()
+		#		#	uv_map = obj.data.uv_layers[map_name[0]]
+		#		#bpy.ops.uv.select_all(action='SELECT')
+		#		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
+		#		#bpy.ops.mesh.scale_uvs()
+			
+		#		bpy.ops.object.mode_set(mode = 'OBJECT')
+		#		bpy.ops.object.select_all(action='DESELECT')
+
+		#for o in sel:
+		#	o.select_set(True)
+		#bpy.ops.object.mode_set(mode = 'EDIT')
+
+		return {'FINISHED'}
+
+class CreateUVChecker(Operator):
+	bl_idname = "object.add_uv_checker"
+	bl_label = "Unwrap Pipe"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Add UV Checker"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def execute(self, context):
+		checker_path = os.path.join(os.path.dirname(__file__),'images/checker_1.png')
+		bpy.ops.image.open(filepath = checker_path)
+
+		material = bpy.context.object.active_material
+		shader = bpy.context.object.active_material.node_tree.nodes.get('Principled BSDF')
+
+		texture_node = material.node_tree.nodes.new('ShaderNodeTexImage')
+		texture_node.image = bpy.data.images['checker_1.png']
+
+		mapping_node = material.node_tree.nodes.new('ShaderNodeMapping')
+		coord_node = material.node_tree.nodes.new('ShaderNodeTexCoord')
+
+		nodes = [texture_node, mapping_node, coord_node]
+
+		value = 200
+		for node in nodes:		
+			node.select = False
+			node.location[0] -= value
+			value += value
+
+		texture_node.label = 'Checker'
+		#link nodes
+		material.node_tree.links.new(texture_node.outputs[0], shader.inputs[0])
+		material.node_tree.links.new(mapping_node.outputs[0], texture_node.inputs[0])
+		material.node_tree.links.new(coord_node.outputs[2], mapping_node.inputs[0])
+
+		bpy.context.space_data.shading.color_type = 'TEXTURE'
+
+		return {'FINISHED'}
+
+class ToggleUVChecker(Operator):
+	bl_idname = "object.show_uv_checker"
+	bl_label = "Show UV Checker"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Show UV Checker"
+	action: bpy.props.BoolProperty(options={'HIDDEN'})
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def execute(self, context):
+		bpy.context.object.active_material.node_tree.nodes.active.inputs[0].node.show_texture = self.action		
+		return {'FINISHED'}
+
+class UVRotate(Operator):
+	bl_idname = "object.rotate_clockwise"
+	bl_label = "UV Rotate Clockwise"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "UV Rotate +90"
+	angle : bpy.props.FloatProperty(options = {'HIDDEN'})
+	
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None	
+
+	def execute(self, context):
+		obj = bpy.context.object
+		bm = bmesh.from_edit_mesh(obj.data)
+		if bm.select_mode != 'FACE':
+			bm.select_mode = {'FACE'}
+
+		sel = [f for f in bm.faces if f.select]
+
+		if bpy.context.scene.tool_settings.use_uv_select_sync == False:
+			bpy.context.scene.tool_settings.use_uv_select_sync = True
+
+		#bpy.ops.uv.select_all(action='DESELECT')
+		bpy.ops.mesh.select_linked(delimit={'SEAM'})
+		if bpy.context.area.type == 'VIEW_3D':
+			bpy.context.area.ui_type = 'UV'
+			bpy.ops.transform.rotate(value= self.angle, orient_axis='Z', orient_type='VIEW', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='VIEW')
+			bpy.ops.uv.select_all(action='DESELECT')
+		bpy.context.area.type = 'VIEW_3D'
+
+		for f in sel:
+			f.select_set(True)
+
+		bm.select_flush_mode()
+		bmesh.update_edit_mesh(obj.data)
+
+
+		return {'FINISHED'}
+
+class UVMirror(Operator):
+	bl_idname = "object.uv_miror"
+	bl_label = "UV Mirror"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "UV Mirror"
+	axis : bpy.props.BoolVectorProperty(options = {'HIDDEN'})
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def execute(self, context):
+		obj = bpy.context.object
+		bm = bmesh.from_edit_mesh(obj.data)
+		if bm.select_mode != 'FACE':
+			bm.select_mode = {'FACE'}
+
+		sel = [f for f in bm.faces if f.select]
+
+		if bpy.context.scene.tool_settings.use_uv_select_sync == False:
+			bpy.context.scene.tool_settings.use_uv_select_sync = True
+		#bpy.ops.uv.select_all(action='DESELECT')
+		bpy.ops.mesh.select_linked(delimit={'SEAM'})
+		if bpy.context.area.type == 'VIEW_3D':
+			bpy.context.area.ui_type = 'UV'
+			bpy.ops.transform.mirror(orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis= self.axis)
+			bpy.ops.uv.select_all(action='DESELECT')
+		bpy.context.area.type = 'VIEW_3D'
+
+		for f in sel:
+			f.select_set(True)
+
+		bm.select_flush_mode()
+		bmesh.update_edit_mesh(obj.data)
 
 		return {'FINISHED'}
 
@@ -957,6 +1288,98 @@ class FixMaterialName(Operator):
 				self.fix_mat_names(context)
 		else:
 			self.fix_mat_names(bpy.context.object)		
+
+		return {'FINISHED'}
+
+class ReplaceMaterials(Operator):
+	bl_idname = "object.replace_materials"
+	bl_label = "Replace Materials"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Replace Materials"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and len(bpy.context.object.material_slots) > 0		
+
+	def do_replace(self, context, obj):
+		src	= bpy.context.scene.src_mat
+		trg	= bpy.context.scene.trg_mat
+
+		index = 0
+		if obj and obj.type == 'MESH' and len(obj.material_slots) > 0:
+			mat_list = obj.data.materials[:]
+			for i in mat_list:
+				#replace 
+				if i.name == trg:
+					if src in bpy.data.materials:
+						obj.data.materials[index] = bpy.data.materials[src]
+					else:
+						obj.data.materials[index].name = src
+						#break
+				index += 1
+
+
+	def execute(self, context):
+		sel = bpy.context.selected_objects
+		if sel:
+			for obj in sel:
+				bpy.context.view_layer.objects.active = obj
+				self.do_replace(context, obj)
+		else:
+			self.do_replace(context, bpy.context.object)		
+
+		return {'FINISHED'}
+
+class ReplaceMaterialsGetter(Operator):
+	bl_idname = "object.replace_materials_get_material"
+	bl_label = "Replace Materials Get/Set Buttons"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Get Material name from Material Slot"
+	mat : bpy.props.StringProperty(options={'HIDDEN'})
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and len(bpy.context.object.material_slots) > 0
+
+	def execute(self, context):
+		active_material = bpy.context.active_object.active_material.name
+		if self.mat== 'src':
+			bpy.context.scene.src_mat = active_material
+		elif self.mat== 'trg':
+			bpy.context.scene.trg_mat = active_material
+
+		return {'FINISHED'}
+
+class ReplaceMaterialsAdder(Operator):
+	bl_idname = "object.replace_materials_add_material"
+	bl_label = "Replace Materials Add Buttons"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Add Material"
+	mat : bpy.props.StringProperty(options={'HIDDEN'})
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and len(bpy.context.object.material_slots) > 0
+
+	def execute(self, context):
+		sel = bpy.context.selected_objects
+		data = bpy.data
+		src	= bpy.context.scene.src_mat
+		trg	= bpy.context.scene.trg_mat
+		for obj in sel:
+			if self.mat== 'add_src':
+				if src not in data.materials:
+					new_mat = data.materials.new(src)
+					obj.data.materials.append(new_mat)
+				else:
+					obj.data.materials.append(data.materials[src])
+
+			elif self.mat== 'add_trg':
+				if trg not in data.materials:
+					new_mat = data.materials.new(trg)
+					obj.data.materials.append(new_mat)
+				else:
+					obj.data.materials.append(data.materials[trg])		
 
 		return {'FINISHED'}
 
@@ -1067,27 +1490,6 @@ class ClearMatSlots(Operator):
 			obj.select_set(True)
 
 		return {'FINISHED'}
-
-class SortMeshMaterials(Operator):
-	
-	bl_label = "Sort Materials"
-	bl_idname = "object.sort_mesh_materials"
-	bl_options = {'REGISTER', 'UNDO'}
-
-	@classmethod
-	def poll(cls, context):
-		return  context.object is not None and len(bpy.context.object.material_slots) > 1
-	
-	def execute(self, context):        
-		obj = bpy.context.object      
-		for j in range (len(obj.material_slots)):
-			for i in range (len(obj.material_slots)-1):
-				obj.active_material_index = i
-				n = obj.active_material.name
-				obj.active_material_index = i+1
-				if obj.active_material.name < n:
-					bpy.ops.object.material_slot_move(direction='UP')
-		return {'FINISHED'}  
 
 class CleanUpUnusedMatsMesh(Operator):
 	
@@ -1631,8 +2033,12 @@ class VertexPaintrFill(Operator):
 											# clamp and paint
 											for s in range(4):
 												obj.vertex_colors.active.data[loop_index].color[s] = round(obj.vertex_colors.active.data[loop_index].color[s], 0)
-											if obj.vertex_colors.active.data[loop_index].color[:3] == to_replace:
+											if to_replace is not None:
+												if obj.vertex_colors.active.data[loop_index].color[:3] == to_replace:
+													obj.vertex_colors.active.data[loop_index].color = replace_with
+											else:
 												obj.vertex_colors.active.data[loop_index].color = replace_with
+
 					else:
 						self._fill_polygon_(obj, replace_with)
 				else:
@@ -1775,6 +2181,54 @@ class CreateGroup(Operator):
 		
 		return {'FINISHED'}
 
+class CreateCollection(Operator):
+	#all LODs must be properly named before use
+	bl_idname = "object.create_collection_with_objects"
+	bl_label = "Create Collection"
+	bl_options = {'REGISTER', 'UNDO'}	
+	bl_description = "Add a new Collection and parent selected objects inside"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def find_collection(self, ao):
+		#find the active object's parent collection
+		collections = bpy.data.collections
+		if len(collections) > 0:
+			for collection in collections:
+				if len(collection.objects) > 0:
+					if ao.name in collection.objects:
+						return collection
+					else:
+						continue
+		else:
+			return bpy.context.view_layer.active_layer_collection.collection
+	
+
+	def execute(self, context):         
+		sel = bpy.context.selected_objects
+		ao = bpy.context.active_object
+		
+		parent_collection = self.find_collection(ao)
+
+		new_collection = bpy.context.blend_data.collections.new(name= ao.name)
+
+		if parent_collection is not None:
+			parent_collection.children.link(new_collection)			
+			for obj in sel:
+				new_collection.objects.link(obj)
+				parent_collection.objects.unlink(obj)
+		else:
+			parent_collection = bpy.context.view_layer.active_layer_collection.collection
+			parent_collection.children.link(new_collection)		
+			for obj in sel:
+				new_collection.objects.link(obj)
+				parent_collection.objects.unlink(obj)
+			
+		
+		return {'FINISHED'}
+
 class MoveToSceneCenter(Operator):
 	bl_idname = "object.move_to_scene_center"
 	bl_label = "Move to Scene Center"
@@ -1868,47 +2322,6 @@ class SocketInObjectPivotPosition(Operator):
 
 		return {'FINISHED'}
 
-
-classes = (
-	CopyApplyModifier,
-	ToggleModifiersByType,
-	ToggleAllModifiersVisibility,
-	TransferModifiers,
-	AddBevelWidthDriver,
-	BevelWidthLerpInputBar,
-	ApplyModifierShapeKeys,
-	RotateEdgeTriangulationQuads,
-	LightsUnwrap,
-	ObjectFixName,
-	CurveBetween2Objects,
-	EdgeToCurve,
-	FixMaterialName,
-	AddBodyMaterials,
-	AddFixtureMaterials,
-	ClearMatSlots,
-	SortMeshMaterials,
-	CleanUpUnusedMatsMesh,
-	CleanUpMatsScene,
-	CleanUpMatsSceneAll,
-	ResetNormalsObject,
-	ToggleZeroOneValuesActiveShapeKey,
-	ToggleZeroOneValuesVertexWeight,
-	AddEmptyShapeKeys,
-	ToggleCarPaint,
-	GenerateHierarchy,
-	VertexPaintrFill,
-	CopyObjectName,
-	PasteObjectName,
-	NameForBake,
-	CreateGroup,
-	MoveToSceneCenter,
-	SocketInVertexSelectionCentre,
-	SocketInObjectPivotPosition,
-	CreateUVs,
-	ScaleUVs,
-	UVSeamsFromHardEdges
-)
-
 # Functions
 def duplicate(cls, context, obj):
 	obj.select_set(True)
@@ -1978,19 +2391,80 @@ def bevel_width_input_menu(self, context):
 			split.prop(context.object, '["bevel_width_driver"]', text = 'Bevel Width')
 			split.operator(BevelWidthLerpInputBar.bl_idname, text = 'Apply')
 
+def scale_uv_checker(self, context):
+	scale = context.scene.checker_scale
+	mapping_node = context.object.active_material.node_tree.nodes.get('Mapping')
+	mapping_node.inputs[3].default_value = (scale, scale, scale)
+	return None
+
 addon_keymaps = []
+
+classes = (
+	CopyApplyModifier,
+	ToggleModifiersByType,
+	ToggleAllModifiersVisibility,
+	TransferModifiers,
+	AddBevelWidthDriver,
+	BevelWidthLerpInputBar,
+	ApplyModifierShapeKeys,
+	RotateEdgeTriangulationQuads,
+	LightsUnwrap,
+	ObjectFixName,
+	CurveBetween2Objects,
+	EdgeToCurve,
+	FixMaterialName,
+	AddBodyMaterials,
+	AddFixtureMaterials,
+	ClearMatSlots,
+	CleanUpUnusedMatsMesh,
+	CleanUpMatsScene,
+	CleanUpMatsSceneAll,
+	ResetNormalsObject,
+	ToggleZeroOneValuesActiveShapeKey,
+	ToggleZeroOneValuesVertexWeight,
+	AddEmptyShapeKeys,
+	ToggleCarPaint,
+	GenerateHierarchy,
+	VertexPaintrFill,
+	CopyObjectName,
+	PasteObjectName,
+	NameForBake,
+	CreateGroup,
+	MoveToSceneCenter,
+	SocketInVertexSelectionCentre,
+	SocketInObjectPivotPosition,
+	CreateUVs,
+	ScaleUVs,
+	UVSeamsFromHardEdges,
+	UnwrapCylinder,
+	UnwrapPipe,
+	CreateUVChecker,
+	ToggleUVChecker,
+	UVRotate,
+	UVMirror,
+	ReplaceMaterials,
+	CreateCollection,
+	ReplaceMaterialsGetter,
+	ReplaceMaterialsAdder
+)
 
 # Register
 def register():
 	for cls in classes:
 		bpy.utils.register_class(cls)
 
+	bpy.types.Scene.src_mat = bpy.props.StringProperty()
+	bpy.types.Scene.trg_mat = bpy.props.StringProperty()
+
+	bpy.types.Scene.checker_scale = bpy.props.FloatProperty(description = 'Checker Size', default = 1.0, min = 1.0, max = 10.0, update = scale_uv_checker)
+	bpy.types.Scene.texel_value = bpy.props.FloatProperty(description = 'Get UVs size', default = 50.0)
+
 	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Replace Vertex Color Mode')
 	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty(description = 'Fill Polygons. Fill Vertices is default')
 	bpy.types.Scene.color_replace = bpy.props.EnumProperty(
 	name="",
 	description="Select color to replace",
-	items=[('R', 'R', ''), ('G', 'G', ''), ('B', 'B', ''), ('White', 'White', ''), ('Black', 'Black', '')]
+	items=[('R', 'R', ''), ('G', 'G', ''), ('B', 'B', ''), ('White', 'White', ''), ('Black', 'Black', ''), ('All', 'All', '')]
 	)
 
 	bpy.types.Scene.vertex_color_alpha_value = bpy.props.FloatProperty(name = '', soft_min = 0, soft_max = 1, description = 'Vertex color alpha value')
@@ -2096,6 +2570,10 @@ def unregister():
 	for cls in reversed(classes):
 		bpy.utils.unregister_class(cls)
 
+	bpy.types.Scene.src_mat
+	bpy.types.Scene.trg_mat
+	bpy.types.Scene.checker_scale
+	bpy.types.Scene.texel_value
 	bpy.types.Scene.color_replace
 	bpy.types.Scene.vertex_color_alpha_value
 	bpy.types.Scene.fill_vertex_paint

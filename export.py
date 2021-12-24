@@ -360,14 +360,6 @@ class RimExport(Operator):
 		use_mesh_modifiers=False
 		)
 
-	#uv scale
-	def scale_XY(self, v, s, p ):
-		return (p[0] + s[0]*(v[0] - p[0]), p[1] + s[1]*(v[1] - p[1]))
-
-	def uv_scale(self, uv_map, scale, pivot ):
-		for uv_index in range(len(uv_map.data) ):
-			uv_map.data[uv_index].uv = self.scale_XY( uv_map.data[uv_index].uv, scale, pivot)
-
 	def complex_rim(self, rim_copies):
 		rim_copies_count = len(rim_copies)
 		if rim_copies_count > 1:
@@ -455,14 +447,10 @@ class RimExport(Operator):
 							bpy.ops.object.mode_set(mode = 'EDIT')
 							bpy.ops.mesh.select_all(action='SELECT')
 							bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0)
+							bpy.ops.mesh.scale_uvs(command = "SET")
 							bpy.ops.mesh.select_all(action='DESELECT')
 							bpy.ops.object.mode_set(mode = 'OBJECT')
 				
-							#scale UVs
-							map_name = rim_copy.data.uv_layers.keys()
-							uv_map = rim_copy.data.uv_layers[map_name[0]]	
-							self.uv_scale(uv_map, (18.9, 18.9), (0.5, 0.5))
-
 				# join copies if complex rim				
 				complex_rim = self.complex_rim(rim_copies)
 
@@ -878,7 +866,6 @@ class NonDestructiveExport(Operator):
 			bpy.context.view_layer.objects.active = convCurves[0]
 			bpy.ops.object.convert(target='MESH')
 			bpy.ops.object.make_single_user(object=True, obdata=True)
-			bpy.ops.object.select_all(action='DESELECT')		
 
 			# add duplicates to the original selection
 			for o in sel:
@@ -888,12 +875,57 @@ class NonDestructiveExport(Operator):
 			for q in self.source_mirrored_curves:
 				q.select_set(False)
 
-				q.hide_select=True			
+				q.hide_select=True	
+				
+			##unwrap curves
+			obj.select_all(action='DESELECT')						
+			for mesh in convCurves:
+				mesh.select_set(True)
+				bpy.context.view_layer.objects.active = mesh
+				bpy.ops.object.mode_set(mode = 'EDIT')
+				bpy.ops.mesh.unwrap_pipe()
+				mesh.select_set(False)
 
+			#scale uvs
+			for mesh in convCurves:
+				mesh.select_set(True)
+				bpy.ops.object.mode_set(mode = 'EDIT')
+
+			if bpy.context.scene.tool_settings.use_uv_select_sync:
+				bpy.context.scene.tool_settings.use_uv_select_sync = False
+			bpy.ops.uv.select_all(action='SELECT')
+			bpy.ops.mesh.scale_uvs(command = "SET")
+
+			#vertex paint			
+			color = None
+			if "color_replace" in bpy.context.scene:
+				color = bpy.context.scene.color_replace
+				if color == "R":
+					color = "Red"
+				elif color == "G":
+					color = "Green"
+				elif color == "B":
+					color = "Blue"
+				else:
+					color = "Black"
+			if 	color is None:
+				color = "Black"
+
+			for mesh in convCurves:
+				mesh.select_set(True)
+				bpy.context.view_layer.objects.active = mesh
+				bpy.ops.object.mode_set(mode = 'EDIT')
+				bpy.ops.mesh.select_all(action='SELECT')
+				bpy.ops.object.fill_vertex_color(color_new = color)
+				bpy.ops.object.mode_set(mode = 'OBJECT')
+				mesh.select_set(False)
+
+			bpy.ops.object.mode_set(mode = 'OBJECT')
+				
 			#back selection
 			obj.select_all(action='DESELECT')
 			for s in sel:
-				s.select_set(True)					
+				s.select_set(True)
 
 			return convCurves
 
@@ -1099,6 +1131,7 @@ class NonDestructiveExport(Operator):
 						self.invertFlippedNormals(conv)
 						for i in conv:
 							i.select_set(True)
+
 
 					if c.object.type == "MESH" and c.active_object.mode == 'OBJECT':				 
 						sel = bpy.context.selected_objects
