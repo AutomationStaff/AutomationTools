@@ -111,16 +111,17 @@ class ToggleModifiersByType(Operator):
 			# create the modifiers list of that type
 			for m in mods_stack:
 				mod = m.type
-				if mod == t:
-					# turn on/off
-					m.show_viewport = state
+				if mod is not None and state is not None:
+					if mod == t:
+						# turn on/off
+						m.show_viewport = state
 			
 		else:
 			self.report({'WARNING'}, "[Error]: Object has no Modifiers")
 	
 	def execute(self, context):		
 		t = self.mod_type
-		sel = bpy.context.selected_objects
+		sel = [obj for obj in bpy.context.selected_objects if obj.type == 'MESH']
 		ao = bpy.context.object	
 		state = False
 		
@@ -712,7 +713,7 @@ class UVSeamsFromHardEdges(Operator):
 		return {'FINISHED'}
 
 class CreateUVs(Operator):
-	bl_idname = "object.create_uvs_by_hard_edges"
+	bl_idname = "mesh.create_uvs_by_hard_edges"
 	bl_label = "Create UVs"
 	bl_options = {'REGISTER', 'UNDO'}
 	bl_description = "Unwrap mesh(es)"
@@ -814,68 +815,69 @@ class ScaleUVs(Operator):
 		bpy.ops.object.mode_set(mode = 'OBJECT')
 		bpy.ops.object.select_all(action='DESELECT')		
 		
-		obj.select_set(True)
-		bpy.context.view_layer.objects.active = obj
-		bpy.ops.object.mode_set(mode = 'EDIT')
+		if obj.type == 'MESH':
+			obj.select_set(True)
+			bpy.context.view_layer.objects.active = obj
+			bpy.ops.object.mode_set(mode = 'EDIT')
 
-		#obj = context.object		
-		if len(obj.data.uv_layers.keys()) > 0:
-			bm = bmesh.from_edit_mesh(obj.data)
-			bpy.ops.uv.average_islands_scale()
+			#obj = context.object		
+			if len(obj.data.uv_layers.keys()) > 0:
+				bm = bmesh.from_edit_mesh(obj.data)
+				bpy.ops.uv.average_islands_scale()
 
-			uv_layer = bm.loops.layers.uv.active
+				uv_layer = bm.loops.layers.uv.active
 
-			uv_face_list = []
-			for f in bm.faces:
-				for loop in f.loops:		
-					uv_data = loop[uv_layer]
-					if uv_data.select:
-						uv_face_list.append(loop.face)
+				uv_face_list = []
+				for f in bm.faces:
+					for loop in f.loops:		
+						uv_data = loop[uv_layer]
+						if uv_data.select:
+							uv_face_list.append(loop.face)
 			
-			if len(uv_face_list):
-				#print(uv_face.index)
+				if len(uv_face_list):
+					#print(uv_face.index)
 
-				#faces = [f for f in bm.faces]
-				# get the biggest face
-				areas = [f.calc_area() for f in uv_face_list]			
+					#faces = [f for f in bm.faces]
+					# get the biggest face
+					areas = [f.calc_area() for f in uv_face_list]			
 			
-				max_val = max(areas)
-				ind =  areas.index(max_val)
+					max_val = max(areas)
+					ind =  areas.index(max_val)
 
-				f = uv_face_list[ind]
+					f = uv_face_list[ind]
 
-				#print("Face: ", f.index)
+					#print("Face: ", f.index)
 
-				verts = [v for v in f.verts]
+					verts = [v for v in f.verts]
 
-				verts = verts[:3]
-				face_perimeter = self.get_triangle_perimeter(verts) 
+					verts = verts[:3]
+					face_perimeter = self.get_triangle_perimeter(verts) 
 
-				coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
-				coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
-				coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
+					coord1 = self.uv_from_vert_first(uv_layer, verts[0], f)
+					coord2 = self.uv_from_vert_first(uv_layer, verts[1], f)
+					coord3 = self.uv_from_vert_first(uv_layer, verts[2], f)
 
-				#loops
-				v0 = [loop for loop in (verts[0].link_loops[:])]
-				v1 = [loop for loop in (verts[1].link_loops[:])]
-				v2 = [loop for loop in (verts[2].link_loops[:])]
+					#loops
+					v0 = [loop for loop in (verts[0].link_loops[:])]
+					v1 = [loop for loop in (verts[1].link_loops[:])]
+					v2 = [loop for loop in (verts[2].link_loops[:])]
 
-				uv_edge_length_1 = (coord1 - coord2).length
-				uv_edge_length_2 = (coord2 - coord3).length
-				uv_edge_length_3 = (coord1 - coord3).length
+					uv_edge_length_1 = (coord1 - coord2).length
+					uv_edge_length_2 = (coord2 - coord3).length
+					uv_edge_length_3 = (coord1 - coord3).length
 
-				face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
+					face_uv_perimeter = (uv_edge_length_1 + uv_edge_length_2 + uv_edge_length_3)
 
-				if face_uv_perimeter and face_perimeter > 0:
-					current_ratio = face_uv_perimeter/face_perimeter
-					return (current_ratio, uv_layer)				
+					if face_uv_perimeter and face_perimeter > 0:
+						current_ratio = face_uv_perimeter/face_perimeter
+						return (current_ratio, uv_layer)				
+					else:
+						self.report({'WARNING'},  "Texel cannot be measured! Check UV zero values")
+						return None
 				else:
-					self.report({'WARNING'},  "Texel cannot be measured! Check UV zero values")
-					return None
+					self.report({'WARNING'},  "Selection update is required. Select UVs manually in the UV Editor.")
 			else:
-				self.report({'WARNING'},  "Selection update is required. Select UVs manually in the UV Editor.")
-		else:
-			self.report({'WARNING'},  "UVMap not found!")
+				self.report({'WARNING'},  "UVMap not found!")
 
 	def execute(self, context):		
 		if_sync = False
@@ -1099,95 +1101,107 @@ class CreateUVChecker(Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return context.object is not None
+		return context.object is not None and context.object.active_material is not None
 
 	def execute(self, context):
 		checker_path = os.path.join(os.path.dirname(__file__),'images/checker_1.png')
 		bpy.ops.image.open(filepath = checker_path)
 
+
 		material = bpy.context.object.active_material
-		shader = bpy.context.object.active_material.node_tree.nodes.get('Principled BSDF')
+		if  material.use_nodes == False:
+			material.use_nodes = True
 
-		texture_node = material.node_tree.nodes.new('ShaderNodeTexImage')
-		texture_node.image = bpy.data.images['checker_1.png']
+		shader = None
+		if bpy.context.object.active_material.node_tree is not None:
+			if 'Principled BSDF' in bpy.context.object.active_material.node_tree.nodes:
+				shader = bpy.context.object.active_material.node_tree.nodes.get('Principled BSDF')
 
-		mapping_node = material.node_tree.nodes.new('ShaderNodeMapping')
-		coord_node = material.node_tree.nodes.new('ShaderNodeTexCoord')
+			if shader is not None:
+				texture_node = material.node_tree.nodes.new('ShaderNodeTexImage')
+				texture_node.image = bpy.data.images['checker_1.png']
 
-		nodes = [texture_node, mapping_node, coord_node]
+				mapping_node = material.node_tree.nodes.new('ShaderNodeMapping')
+				coord_node = material.node_tree.nodes.new('ShaderNodeTexCoord')
 
-		value = 200
-		for node in nodes:		
-			node.select = False
-			node.location[0] -= value
-			value += value
+				nodes = [texture_node, mapping_node, coord_node]
 
-		texture_node.label = 'Checker'
-		#link nodes
-		material.node_tree.links.new(texture_node.outputs[0], shader.inputs[0])
-		material.node_tree.links.new(mapping_node.outputs[0], texture_node.inputs[0])
-		material.node_tree.links.new(coord_node.outputs[2], mapping_node.inputs[0])
+				value = 200
+				for node in nodes:		
+					node.select = False
+					node.location[0] -= value
+					value += value
 
-		bpy.context.space_data.shading.color_type = 'TEXTURE'
+				texture_node.label = 'Checker'
+				#link nodes
+				material.node_tree.links.new(texture_node.outputs[0], shader.inputs[0])
+				material.node_tree.links.new(mapping_node.outputs[0], texture_node.inputs[0])
+				material.node_tree.links.new(coord_node.outputs[2], mapping_node.inputs[0])
+
+				bpy.context.space_data.shading.color_type = 'TEXTURE'
+		else:
+			self.report({'WARNING'},  "Principled BSDF is required! Activate Shader Nodes if they are not used")
+
 
 		return {'FINISHED'}
 
 class ToggleUVChecker(Operator):
-	bl_idname = "object.show_uv_checker"
+	bl_idname = "mesh.show_uv_checker"
 	bl_label = "Show UV Checker"
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = "Show UV Checker"
+	bl_description = "Toggle UV Checker. Solid mode only"
 	action: bpy.props.BoolProperty(options={'HIDDEN'})
 
 	@classmethod
 	def poll(cls, context):
-		return context.object is not None
+		return context.object is not None and context.object.active_material is not None
 
 	def execute(self, context):
 		bpy.context.object.active_material.node_tree.nodes.active.inputs[0].node.show_texture = self.action		
 		return {'FINISHED'}
 
 class UVRotate(Operator):
-	bl_idname = "object.rotate_clockwise"
-	bl_label = "UV Rotate Clockwise"
+	bl_idname = "mesh.rotate_clockwise"
+	bl_label = "UV Rotate 90 deg"
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = "UV Rotate +90"
+	bl_description = "UV Rotate 90 deg"
 	angle : bpy.props.FloatProperty(options = {'HIDDEN'})
 	
 	@classmethod
 	def poll(cls, context):
-		return context.object is not None	
+		return context.object is not None and context.object.active_material is not None	
 
 	def execute(self, context):
-		obj = bpy.context.object
-		bm = bmesh.from_edit_mesh(obj.data)
-		if bm.select_mode != 'FACE':
-			bm.select_mode = {'FACE'}
+		if context.mode == 'OBJECT':
+			self.report({'WARNING'},  "UV Rotation can be performed only in Edit Mode!")
+		else:
+			obj = bpy.context.object
+			bm = bmesh.from_edit_mesh(obj.data)
+			if bm.select_mode != 'FACE':
+				bm.select_mode = {'FACE'}
 
-		sel = [f for f in bm.faces if f.select]
+			sel = [f for f in bm.faces if f.select]
 
-		if bpy.context.scene.tool_settings.use_uv_select_sync == False:
-			bpy.context.scene.tool_settings.use_uv_select_sync = True
+			if bpy.context.scene.tool_settings.use_uv_select_sync == False:
+				bpy.context.scene.tool_settings.use_uv_select_sync = True
 
-		#bpy.ops.uv.select_all(action='DESELECT')
-		bpy.ops.mesh.select_linked(delimit={'SEAM'})
-		if bpy.context.area.type == 'VIEW_3D':
-			bpy.context.area.ui_type = 'UV'
-			bpy.ops.transform.rotate(value= self.angle, orient_axis='Z', orient_type='VIEW', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='VIEW')
-			bpy.ops.uv.select_all(action='DESELECT')
-		bpy.context.area.type = 'VIEW_3D'
+			bpy.ops.mesh.select_linked(delimit={'UV'})
+			if bpy.context.area.type == 'VIEW_3D':
+				bpy.context.area.ui_type = 'UV'
+				bpy.ops.transform.rotate(value= self.angle, orient_axis='Z', orient_type='VIEW', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='VIEW')
+				bpy.ops.uv.select_all(action='DESELECT')
+			bpy.context.area.type = 'VIEW_3D'
 
-		for f in sel:
-			f.select_set(True)
+			for f in sel:
+				f.select_set(True)
 
-		bm.select_flush_mode()
-		bmesh.update_edit_mesh(obj.data)
-
+			bm.select_flush_mode()
+			bmesh.update_edit_mesh(obj.data)
 
 		return {'FINISHED'}
 
 class UVMirror(Operator):
-	bl_idname = "object.uv_miror"
+	bl_idname = "mesh.uv_miror"
 	bl_label = "UV Mirror"
 	bl_options = {'REGISTER', 'UNDO'}
 	bl_description = "UV Mirror"
@@ -1195,31 +1209,34 @@ class UVMirror(Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return context.object is not None
+		return context.object is not None and context.object.active_material is not None
 
 	def execute(self, context):
-		obj = bpy.context.object
-		bm = bmesh.from_edit_mesh(obj.data)
-		if bm.select_mode != 'FACE':
-			bm.select_mode = {'FACE'}
+		if context.mode == 'OBJECT':
+			self.report({'WARNING'},  "UV Mirror can be performed only in Edit Mode!")
+		else:
+			obj = bpy.context.object
+			bm = bmesh.from_edit_mesh(obj.data)
+			if bm.select_mode != 'FACE':
+				bm.select_mode = {'FACE'}
 
-		sel = [f for f in bm.faces if f.select]
+			sel = [f for f in bm.faces if f.select]
 
-		if bpy.context.scene.tool_settings.use_uv_select_sync == False:
-			bpy.context.scene.tool_settings.use_uv_select_sync = True
-		#bpy.ops.uv.select_all(action='DESELECT')
-		bpy.ops.mesh.select_linked(delimit={'SEAM'})
-		if bpy.context.area.type == 'VIEW_3D':
-			bpy.context.area.ui_type = 'UV'
-			bpy.ops.transform.mirror(orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis= self.axis)
-			bpy.ops.uv.select_all(action='DESELECT')
-		bpy.context.area.type = 'VIEW_3D'
+			if bpy.context.scene.tool_settings.use_uv_select_sync == False:
+				bpy.context.scene.tool_settings.use_uv_select_sync = True
+			#bpy.ops.uv.select_all(action='DESELECT')
+			bpy.ops.mesh.select_linked(delimit={'UV'})
+			if bpy.context.area.type == 'VIEW_3D':
+				bpy.context.area.ui_type = 'UV'
+				bpy.ops.transform.mirror(orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis= self.axis)
+				bpy.ops.uv.select_all(action='DESELECT')
+			bpy.context.area.type = 'VIEW_3D'
 
-		for f in sel:
-			f.select_set(True)
+			for f in sel:
+				f.select_set(True)
 
-		bm.select_flush_mode()
-		bmesh.update_edit_mesh(obj.data)
+			bm.select_flush_mode()
+			bmesh.update_edit_mesh(obj.data)
 
 		return {'FINISHED'}
 
@@ -1354,7 +1371,7 @@ class ReplaceMaterialsAdder(Operator):
 	bl_idname = "object.replace_materials_add_material"
 	bl_label = "Replace Materials Add Buttons"
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = "Add Material"
+	bl_description = "Add a new or existing material to the material slot. A new one will be added if the material specified in target/source fields does not exist"
 	mat : bpy.props.StringProperty(options={'HIDDEN'})
 
 	@classmethod
@@ -1377,9 +1394,11 @@ class ReplaceMaterialsAdder(Operator):
 			elif self.mat== 'add_trg':
 				if trg not in data.materials:
 					new_mat = data.materials.new(trg)
-					obj.data.materials.append(new_mat)
+					obj.data.materials.append(new_mat)					
 				else:
-					obj.data.materials.append(data.materials[trg])		
+					obj.data.materials.append(data.materials[trg])
+		obj.active_material_index = len(obj.data.materials) -1
+					
 
 		return {'FINISHED'}
 
@@ -2456,8 +2475,8 @@ def register():
 	bpy.types.Scene.src_mat = bpy.props.StringProperty()
 	bpy.types.Scene.trg_mat = bpy.props.StringProperty()
 
-	bpy.types.Scene.checker_scale = bpy.props.FloatProperty(description = 'Checker Size', default = 1.0, min = 1.0, max = 10.0, update = scale_uv_checker)
-	bpy.types.Scene.texel_value = bpy.props.FloatProperty(description = 'Get UVs size', default = 50.0)
+	bpy.types.Scene.checker_scale = bpy.props.FloatProperty(description = 'Scale Checker Texture. Textured Mode only', default = 1.0, min = 1.0, max = 10.0, update = scale_uv_checker)
+	bpy.types.Scene.texel_value = bpy.props.FloatProperty(description = 'UV size value. Default Automation UV size is 50, which is 1x1 scene unit = 128x128 px texture', default = 50.0)
 
 	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Replace Vertex Color Mode')
 	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty(description = 'Fill Polygons. Fill Vertices is default')

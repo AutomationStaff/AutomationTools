@@ -148,7 +148,9 @@ class UVToolsPanel(Panel):
 		split = column.split(factor=0.5, align=True)
 		split.operator(ToggleUVChecker.bl_idname, text = "Show").action = False
 		split.operator(ToggleUVChecker.bl_idname, text = "Hide").action = True
-		column.prop(bpy.context.scene, 'checker_scale', text = "Scale")
+		
+		if context.object is not None and context.object.active_material is not None:
+			column.prop(bpy.context.scene, 'checker_scale', text = "Scale")
 		
 		column.label(text="Transform")
 		split = column.split(factor=0.5, align=True)
@@ -237,8 +239,21 @@ class MaterialsCleanupPanel(Panel):
 		column.operator("object.cleanup_mats_scene_unused", text = "Unused")
 		column.operator("object.cleanup_mats_scene_all", text = "All")
 
-		column.label(text = 'Replace')
 
+class MaterialsEditPanel(Panel):
+	bl_label = "Edit"
+	bl_idname = "OBJECT_PT_automation_tools_materials_edit_panel"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'	
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = MaterialsPanel.bl_idname
+	
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column(align=True)
+
+		column.label(text = 'Add/Replace:')
 		split = column.split(factor=0.8, align=True)
 		split.prop(bpy.context.scene, 'src_mat', text = 'Source')
 		split.operator(ReplaceMaterialsGetter.bl_idname, text = "Get").mat = 'src'
@@ -1297,7 +1312,8 @@ classes = (
 	SelectBonesMenu,
 	SocketsPanel,
 	UVToolsPanel,
-	ATWiki
+	ATWiki,
+	MaterialsEditPanel
 )
 
 # Functions
