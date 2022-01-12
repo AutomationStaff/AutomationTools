@@ -27,7 +27,7 @@ bl_info = {
 	"name": "Automation Tools",
 	"description": "Automation Modeling, Rigging and Skinning Tools",
 	"author": "Camshaft Software",
-	"version": (1, 0, 5),
+	"version": (1, 0, 6),
 	"blender": (2, 92, 0),
 	"location": "Sidebar -> Automation Tools",
 	"url": "https://github.com/AutomationStaff/AutomationTools",
