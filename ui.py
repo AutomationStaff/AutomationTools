@@ -7,6 +7,7 @@ from . modeling import *
 from . generators import *
 from . rigging_skinning import *
 from . export import *
+import webbrowser
 
 # Main Panels
 class ModelingPanel(Panel):
