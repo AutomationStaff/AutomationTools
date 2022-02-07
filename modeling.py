@@ -624,7 +624,7 @@ class RotateEdgeTriangulationQuads(Operator):
 		if qm == 'FIXED':
 			qm = self.quad_method			
 			bpy.ops.mesh.quads_convert_to_tris(quad_method = qm)			
-			bpy.ops.mesh.select_all(action='DESELECT')
+			#bpy.ops.mesh.select_all(action='DESELECT')
 			
 			self.update(bm, obj)
 			
@@ -632,11 +632,14 @@ class RotateEdgeTriangulationQuads(Operator):
 			
 			#dissolve new edges
 			bmesh.ops.dissolve_edges(bm, edges = new_edges, use_verts = False, use_face_split = False)			
-			bpy.context.tool_settings.mesh_select_mode = (False, False, True)
+			bpy.context.tool_settings.mesh_select_mode = (False, False, True)			
+			self.update(bm, obj) 			
 			
 			# reset normals
 			bm.normal_update()
 			bpy.ops.object.reset_normals_object()
+
+			
 		else:
 			self.report({'WARNING'},  "Select 'Fixed' Quad Method in the Triangulate Modifier options!")
 
@@ -1422,20 +1425,15 @@ class AddBodyMaterials(Operator):
 		'Chrome',
 		'Paint_Two_Tone',
 		'Plastic',
-		'Reflective_Mirror',
-		'Soft_Top',
+		'Car_Roof',
 		'Trim',
 		'Window_Pillar',
 		'Window_Trim',
 		'Windows',
-		'Wing_Mirror_Trim',
 		'BonnetCam',
-		'CabinBounds',
-		'CargoBounds',
 		'DriverCam',
-		'FrontBounds',
 		'LipPlacement',
-		'LowerBounds'
+		'Miscellaneous'
 		]
 
 		# add to the mesh material slots
@@ -1635,7 +1633,9 @@ class ResetNormalsObject(Operator):
 
 	def execute(self, context): 
 		mod = bpy.context.mode
-
+		bm = bmesh.from_edit_mesh(bpy.context.object.data)
+		sel = [f for f in bm.faces if f.select]
+			
 		if bpy.context.active_object:
 			if bpy.context.object.type == "MESH":
 				if bpy.context.mode == "OBJECT":
@@ -1646,6 +1646,10 @@ class ResetNormalsObject(Operator):
 			bpy.ops.mesh.select_all(action='DESELECT')
 
 		bpy.ops.object.mode_set(mode = (mod.replace("_MESH", "")))
+
+		# back to original selection
+		for f in sel:
+			f.select_set(True)
 
 		return {'FINISHED'}
 
