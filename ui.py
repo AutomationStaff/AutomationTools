@@ -240,7 +240,6 @@ class MaterialsCleanupPanel(Panel):
 		column.operator("object.cleanup_mats_scene_unused", text = "Unused")
 		column.operator("object.cleanup_mats_scene_all", text = "All")
 
-
 class MaterialsEditPanel(Panel):
 	bl_label = "Edit"
 	bl_idname = "OBJECT_PT_automation_tools_materials_edit_panel"
@@ -480,12 +479,12 @@ class VertexPaintPanel(Panel):
 		layout = self.layout
 
 		row = layout.row(align=True)
-		row.operator("object.fill_vertex_color", text = "BL").color_new = "Black"
-		row.operator("object.fill_vertex_color", text = "WH").color_new = "White"
-		row.operator("object.fill_vertex_color", text = "R").color_new = "Red"
-		row.operator("object.fill_vertex_color", text = "G").color_new = "Green"
-		row.operator("object.fill_vertex_color", text = "B").color_new = "Blue"
-		row.operator("object.fill_vertex_color", text = "A").color_new = "A"
+		row.operator("mesh.fill_vertex_color", text = "BL").color_new = "Black"
+		row.operator("mesh.fill_vertex_color", text = "WH").color_new = "White"
+		row.operator("mesh.fill_vertex_color", text = "R").color_new = "Red"
+		row.operator("mesh.fill_vertex_color", text = "G").color_new = "Green"
+		row.operator("mesh.fill_vertex_color", text = "B").color_new = "Blue"
+		row.operator("mesh.fill_vertex_color", text = "A").color_new = "A"
 		row.prop(bpy.context.scene, 'vertex_color_alpha_value', text = '')
 
 		column = layout.column()
@@ -498,6 +497,10 @@ class VertexPaintPanel(Panel):
 			row = layout.row()			
 			row.label(text = 'Color to replace:')
 			row.prop(bpy.context.scene, 'color_replace', text = '')
+			
+			row.label(text = 'Channels:')
+			row.operator("mesh.channel_on_off", text = "On").action = 1.0
+			row.operator("mesh.channel_on_off", text = "Off").action = 0.0
 		
 class BrushPanel(Panel):
 	bl_label = "Brush"
@@ -550,7 +553,8 @@ class BrushCustomizedSettingsPanel(Panel):
 		layout = self.layout
 		column = layout.column()
 
-		column.operator("brush.draw_brush_template_settings", text = "Weight Paint 2D")
+		column.operator("brush.draw_brush_template_settings_1", text = "Preset 1")
+		column.operator("brush.draw_brush_template_settings_2", text = "Preset 2")
 
 class WeightsPanel(Panel):
 	bl_label = "Weights"

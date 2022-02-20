@@ -577,9 +577,9 @@ class ClampNearZeroValues(Operator):
 
 		return {'FINISHED'}
 
-class DrawBrushTemplateSettings(Operator):
-	bl_label = "Set Predefined Settings"
-	bl_idname = "brush.draw_brush_template_settings"
+class DrawBrushTemplateSettings1(Operator):
+	bl_label = "Weight Paint Settings 1"
+	bl_idname = "brush.draw_brush_template_settings_1"
 	bl_description = "Use preset settings. Auto Normalize = 'True', Falloff = 'Constant', Falloff Shape = 'PROJECTED', Lock Relative = 'True', Restrict = 'True'"
 	bl_options = {'REGISTER', 'UNDO'}
 
@@ -617,6 +617,53 @@ class DrawBrushTemplateSettings(Operator):
 
 		if bpy.context.scene.tool_settings.weight_paint.use_group_restrict == False:
 			bpy.context.scene.tool_settings.weight_paint.use_group_restrict = True
+
+		return {'FINISHED'}
+
+class DrawBrushTemplateSettings2(Operator):
+	bl_label = "Weight Paint Settings 2"
+	bl_idname = "brush.draw_brush_template_settings_2"
+	bl_description = "Use preset settings. Auto Normalize = 'True', Falloff = 'Constant', Falloff Shape = 'PROJECTED', Lock Relative = 'False', Restrict = 'False'"
+	bl_options = {'REGISTER', 'UNDO'}
+
+	def execute(self, context):
+
+		draw_brush = bpy.data.brushes["Draw"]
+		if draw_brush.curve_preset != 'CONSTANT':
+			draw_brush.curve_preset = 'CONSTANT'
+
+		if draw_brush.falloff_shape != 'PROJECTED':
+			draw_brush.falloff_shape = 'PROJECTED'
+
+		blur_brush = bpy.data.brushes["Blur"]
+		if blur_brush.curve_preset != 'CONSTANT':
+			blur_brush.curve_preset = 'CONSTANT'
+
+		if blur_brush.falloff_shape != 'PROJECTED':
+			blur_brush.falloff_shape = 'PROJECTED'
+
+		average_brush = bpy.data.brushes["Average"]
+		if average_brush.curve_preset != 'CONSTANT':
+			average_brush.curve_preset = 'CONSTANT'
+
+		if average_brush.falloff_shape != 'PROJECTED':
+			average_brush.falloff_shape = 'PROJECTED'
+
+		if bpy.context.scene.tool_settings.use_auto_normalize == False:
+			bpy.context.scene.tool_settings.use_auto_normalize = True
+
+		if bpy.context.scene.tool_settings.use_lock_relative == True:
+				bpy.context.scene.tool_settings.use_lock_relative = False		
+
+		if draw_brush.use_frontface == True:
+			draw_brush.use_frontface = False
+
+		if bpy.context.scene.tool_settings.weight_paint.use_group_restrict == True:
+			bpy.context.scene.tool_settings.weight_paint.use_group_restrict = False
+		
+		if bpy.context.object.data.use_paint_mask_vertex == False:
+			bpy.context.object.data.use_paint_mask_vertex = True
+
 
 		return {'FINISHED'}
 
@@ -846,7 +893,8 @@ classes = (
 	FillAllVG,
 	FillActiveVG,
 	DrawBrushBlendToggle,
-	DrawBrushTemplateSettings,
+	DrawBrushTemplateSettings1,
+	DrawBrushTemplateSettings2,
 	ToggleDrawBrushAddSub,	
 	PickActiveMesh,
 	WeightPaintModeOn,
@@ -1069,8 +1117,6 @@ def register():
 		description = "Select Edit Mode",
 		default = False
 	)
-
-
 
 def unregister():
 	for cls in reversed(classes):
