@@ -32,7 +32,11 @@ class ExportPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column()
+		column.label(text = 'File Path:')
 		column.prop(bpy.context.scene, "export_path")
+		#if 'offset_x' in bpy.context.object:
+		#	column.label(text = 'Offset:')
+		#	column.prop(bpy.data.objects[bpy.context.object.name], '["offset_x"]', text = 'X')
 
 class GeneratorsPanel(Panel):
 	bl_label = "Generators"
@@ -72,6 +76,10 @@ class ActiveMeshPanel(Panel):
 		
 		split = column.split(factor=0.75, align=True)
 		split.prop(bpy.context.scene, 'active_mesh')
+
+		if 'Armature' in context.object.modifiers:
+			column.template_ID(bpy.context.object.modifiers['Armature'], "object")
+
 		split.operator("object.pick_active_mesh", icon='EYEDROPPER')
 		column.operator("object.add_armature_mod", text = "Add [Armature] [Modifier]")
 		column.operator(SelectActiveMesh.bl_idname, text = "Select").mode='EDIT'
@@ -571,14 +579,20 @@ class WeightsPanel(Panel):
 		layout.prop(bpy.context.scene, 'vertex_weight_input', slider = True)
 		
 		column = layout.column(align=True)
-		split1 = column.split(factor=0.5, align=True)
-		split1.operator("object.shift_weights", text = "Increase").action = True
-		split1.operator("object.shift_weights", text = "Decrease").action = False
+		split1 = column.split(factor=0.33, align=True)
+		split1.operator("object.fill_active_vg", text = "Add").mode = 'ADD'
+		split1.operator("object.fill_active_vg", text = "Subtract").mode = 'SUBTRACT'
+		split1.operator("object.fill_active_vg", text = "Replace").mode = 'REPLACE'
+
+		#column = layout.column(align=True)
+		#split1 = column.split(factor=0.5, align=True)
+		#split1.operator("object.shift_weights", text = "Increase").action = True
+		#split1.operator("object.shift_weights", text = "Decrease").action = False
 		
-		split2 = column.split(factor=0.33, align=True)
-		split2.operator("object.fill_active_vg", text = "Sel").only_selected = True
-		split2.operator("object.fill_active_vg", text = "Act").only_selected = False
-		split2.operator("object.fill_all_vg", text = "All")
+		#split2 = column.split(factor=0.33, align=True)
+		#split2.operator("object.fill_active_vg", text = "Sel").only_selected = True
+		#split2.operator("object.fill_active_vg", text = "Act").only_selected = False
+		#split2.operator("object.fill_all_vg", text = "All")
 		column.operator("object.clamp_near_zero_values", text = "Clamp")
 
 class NormalsPanel(Panel):
@@ -782,9 +796,9 @@ class FixturesExportPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
-		column.operator("object.standard_batch_export", text = "Selected Objects")
-		column.operator("object.fixture_export", text = "One Collection")
-		column.operator("object.fixtures_batch_export", text = "All Collections")		
+		column.operator("object.selected_fixtures_batch_export", text = "Selected Meshes")
+		column.operator("object.fixture_export", text = "Active Collection")
+		column.operator("object.fixtures_batch_export", text = "Batch Collections")	
 
 class OptionsPanel(Panel):
 	bl_label = "Options"
@@ -849,15 +863,20 @@ class FenderSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Fender")
 		bone1.name='R_Fender'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Lip")
 		bone2.name='R_FenderLip'
+		bone2.symmetry=True
 
 		bone3 = layout.operator("object.generate_rig", text = "Height")
 		bone3.name='R_FenderHeight'
+		bone3.symmetry=True
 
 		bone4 = layout.operator("object.generate_rig", text = "Arch Size")
 		bone4.name='Fender_Arch_Size'
+		bone4.symmetry=False
+		
 
 class QuarterSubMenu(Menu):
 	bl_label = "Quarter Menu"
@@ -868,15 +887,19 @@ class QuarterSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Quarter")
 		bone1.name='R_Quarter'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Lip")
 		bone2.name='R_QuarterLip'
+		bone2.symmetry=True
 
 		bone3 = layout.operator("object.generate_rig", text = "Height")
 		bone3.name='R_QuarterHeight'
+		bone3.symmetry=True
 
 		bone4 = layout.operator("object.generate_rig", text = "Arch Size")
 		bone4.name='Quarter_Arch_Size'
+		bone4.symmetry=False
 
 class SideSubMenu(Menu):
 	bl_label = "Side Menu"
@@ -887,15 +910,19 @@ class SideSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Side")
 		bone1.name='R_Side'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Detail 1")
 		bone2.name='R_SideDetail1'
+		bone2.symmetry=True
 
 		bone3 = layout.operator("object.generate_rig", text = "Detail 2")
 		bone3.name='R_SideDetail2'
+		bone3.symmetry=True
 
 		bone4 = layout.operator("object.generate_rig", text = "Detail 3")
 		bone4.name='R_SideDetail3'
+		bone4.symmetry=True
 
 class RockerSubMenu(Menu):
 	bl_label = "Rocker Menu"
@@ -906,9 +933,11 @@ class RockerSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Panel")
 		bone1.name='R_RockerPanel'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Detail")
 		bone2.name='R_RockerDetail'
+		bone2.symmetry=True
 
 class FrontSubMenu(Menu):
 	bl_label = "Front Menu"
@@ -919,18 +948,23 @@ class FrontSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Length")
 		bone1.name='Front_Length'
+		bone1.symmetry=False
 
 		bone2 = layout.operator("object.generate_rig", text = "Angle")
 		bone2.name='R_FrontAngle'
+		bone2.symmetry=True
 
 		bone3 = layout.operator("object.generate_rig", text = "Detail 1")
 		bone3.name='Front_Detail_1'
+		bone3.symmetry=False
 
 		bone4 = layout.operator("object.generate_rig", text = "Detail 2")
 		bone4.name='Front_Detail_2'
+		bone4.symmetry=False
 
 		bone5 = layout.operator("object.generate_rig", text = "Detail 3")
 		bone5.name='Front_Detail_3'
+		bone5.symmetry=False
 
 class RearSubMenu(Menu):
 	bl_label = "Rear Menu"
@@ -941,18 +975,24 @@ class RearSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Length")
 		bone1.name='Rear_Length'
+		bone1.symmetry=False
 
 		bone2 = layout.operator("object.generate_rig", text = "Angle")
 		bone2.name='R_RearAngle'
+		bone2.symmetry=True
 
 		bone3 = layout.operator("object.generate_rig", text = "Detail 1")
 		bone3.name='Rear_Detail_1'
+		bone3.symmetry=False
 
 		bone4 = layout.operator("object.generate_rig", text = "Detail 2")
 		bone4.name='Rear_Detail_2'
+		bone4.symmetry=False
 
 		bone5 = layout.operator("object.generate_rig", text = "Detail 3")
 		bone5.name='Rear_Detail_3'
+		bone5.symmetry=False
+		
 
 class PillarSubMenu(Menu):
 	bl_label = "Pillar Menu"
@@ -963,63 +1003,83 @@ class PillarSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "A Pillar")
 		bone1.name='A_Pillar'
+		bone1.symmetry=False
 
 		bone2 = layout.operator("object.generate_rig", text = "A Adjustment")
 		bone2.name='A_Pillar_Adjustment'
+		bone2.symmetry=False
 
 		bone3 = layout.operator("object.generate_rig", text = "A Upper")
 		bone3.name='A_Pillar_Upper'
+		bone3.symmetry=False
 
 		bone4 = layout.operator("object.generate_rig", text = "A Mid")
 		bone4.name='A_Pillar_Mid'
+		bone4.symmetry=False
 
 		bone5 = layout.operator("object.generate_rig", text = "A Lower")
 		bone5.name='A_Pillar_Lower'
+		bone5.symmetry=False
 
 		bone6 = layout.operator("object.generate_rig", text = "B Pillar")
 		bone6.name='B_Pillar'
+		bone6.symmetry=False
 
 		bone7 = layout.operator("object.generate_rig", text = "B Adjustment")
 		bone7.name='B_Pillar_Adjustment'
+		bone7.symmetry=False
 
 		bone8 = layout.operator("object.generate_rig", text = "B Upper")
 		bone8.name='B_Pillar_Upper'
+		bone8.symmetry=False
 
 		bone9 = layout.operator("object.generate_rig", text = "B Mid")
 		bone9.name='B_Pillar_Mid'
+		bone9.symmetry=False
 
 		bone10 = layout.operator("object.generate_rig", text = "B Lower")
 		bone10.name='B_Pillar_Lower'
+		bone10.symmetry=False
 
 		bone11 = layout.operator("object.generate_rig", text = "C Pillar")
 		bone11.name='C_Pillar'
+		bone11.symmetry=False
 
 		bone12 = layout.operator("object.generate_rig", text = "C Adjustment")
 		bone12.name='C_Pillar_Adjustment'
+		bone12.symmetry=False
 
 		bone13 = layout.operator("object.generate_rig", text = "C Upper")
 		bone13.name='C_Pillar_Upper'
+		bone13.symmetry=False
 
 		bone14 = layout.operator("object.generate_rig", text = "C Mid")
 		bone14.name='C_Pillar_Mid'
+		bone14.symmetry=False
 
 		bone15 = layout.operator("object.generate_rig", text = "C Lower")
 		bone15.name='C_Pillar_Lower'
+		bone15.symmetry=False
 
 		bone16 = layout.operator("object.generate_rig", text = "D Pillar")
 		bone16.name='D_Pillar'
+		bone16.symmetry=False
 
 		bone17 = layout.operator("object.generate_rig", text = "D Adjustment")
 		bone17.name='D_Pillar_Adjustment'
+		bone17.symmetry=False
 
 		bone18 = layout.operator("object.generate_rig", text = "D Upper")
 		bone18.name='D_Pillar_Upper'
+		bone18.symmetry=False
 
 		bone19 = layout.operator("object.generate_rig", text = "D Mid")
 		bone19.name='D_Pillar_Mid'
+		bone19.symmetry=False
 
 		bone20 = layout.operator("object.generate_rig", text = "D Lower")
 		bone20.name='D_Pillar_Lower'
+		bone20.symmetry=False
 
 class RoofSubMenu(Menu):
 	bl_label = "Roof Menu"
@@ -1030,9 +1090,11 @@ class RoofSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Height")
 		bone1.name='Roof_Height'
+		bone1.symmetry=False
 
 		bone2 = layout.operator("object.generate_rig", text = "Detail")
 		bone2.name='Roof_Detail'
+		bone2.symmetry=False
 
 class CargoSubMenu(Menu):
 	bl_label = "Roof Menu"
@@ -1043,9 +1105,11 @@ class CargoSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Height")
 		bone1.name='Cargo_Height'
+		bone1.symmetry=False
 
 		bone2 = layout.operator("object.generate_rig", text = "Detail")
 		bone2.name='Cargo_Detail'
+		bone2.symmetry=False
 		
 class HoodSubMenu(Menu):
 	bl_label = "Hood Menu"
@@ -1056,18 +1120,23 @@ class HoodSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Angle")
 		bone1.name='R_HoodAngle'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Slant")
 		bone2.name='Hood_Slant'
+		bone1.symmetry=False
 
 		bone3 = layout.operator("object.generate_rig", text = "Detail 1")
 		bone3.name='Hood_Detail_1'
+		bone2.symmetry=False
 
 		bone4 = layout.operator("object.generate_rig", text = "Detail 2")
 		bone4.name='Hood_Detail_2'
+		bone4.symmetry=False
 
 		bone5 = layout.operator("object.generate_rig", text = "Detail 3")
 		bone5.name='Hood_Detail_3'
+		bone5.symmetry=False
 
 class BootSubMenu(Menu):
 	bl_label = "Boot Menu"
@@ -1078,18 +1147,23 @@ class BootSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Angle")
 		bone1.name='R_BootAngle'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Slant")
 		bone2.name='Boot_Slant'
+		bone2.symmetry=False
 
 		bone3 = layout.operator("object.generate_rig", text = "Detail 1")
 		bone3.name='Boot_Detail_1'
+		bone3.symmetry=False
 
 		bone4 = layout.operator("object.generate_rig", text = "Detail 2")
 		bone4.name='Boot_Detail_2'
+		bone4.symmetry=False
 
 		bone5 = layout.operator("object.generate_rig", text = "Detail 3")
 		bone5.name='Boot_Detail_3'
+		bone5.symmetry=False
 
 class FrontBumperSubMenu(Menu):
 	bl_label = "Front Bumper Menu"
@@ -1100,24 +1174,31 @@ class FrontBumperSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Front")
 		bone1.name='Front_Bumper'
+		bone1.symmetry=False
 
 		bone2 = layout.operator("object.generate_rig", text = "Lip")
 		bone2.name='Front_Bumper_Lip'
+		bone2.symmetry=False
 
 		bone3 = layout.operator("object.generate_rig", text = "Upper")
 		bone3.name='Front_Bumper_Upper'
+		bone3.symmetry=False
 
 		bone4 = layout.operator("object.generate_rig", text = "Lower")
 		bone4.name='Front_Bumper_Lower'
+		bone4.symmetry=False
 
 		bone5 = layout.operator("object.generate_rig", text = "Detail 1")
 		bone5.name='Front_Bumper_Detail_1'
+		bone5.symmetry=False
 
 		bone6 = layout.operator("object.generate_rig", text = "Detail 2")
 		bone6.name='Front_Bumper_Detail_2'
+		bone6.symmetry=False
 
 		bone7 = layout.operator("object.generate_rig", text = "Detail 3")
 		bone7.name='Front_Bumper_Detail_3'
+		bone7.symmetry=False
 
 class RearBumperSubMenu(Menu):
 	bl_label = "Rear Bumper Menu"
@@ -1128,24 +1209,31 @@ class RearBumperSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Rear")
 		bone1.name='Rear_Bumper'
+		bone1.symmetry=False
 
 		bone2 = layout.operator("object.generate_rig", text = "Lip")
 		bone2.name='Rear_Bumper_Lip'
+		bone2.symmetry=False
 
 		bone3 = layout.operator("object.generate_rig", text = "Upper")
 		bone3.name='Rear_Bumper_Upper'
+		bone3.symmetry=False
 
 		bone4 = layout.operator("object.generate_rig", text = "Lower")
 		bone4.name='Rear_Bumper_Lower'
+		bone4.symmetry=False
 
 		bone5 = layout.operator("object.generate_rig", text = "Detail 1")
 		bone5.name='RearBumper_Detail_1'
+		bone5.symmetry=False
 
 		bone6 = layout.operator("object.generate_rig", text = "Detail 2")
 		bone6.name='Rear_Bumper_Detail_2'
+		bone6.symmetry=False
 
 		bone7 = layout.operator("object.generate_rig", text = "Detail 3")
 		bone7.name='Rear_Bumper_Detail_3'
+		bone7.symmetry=False
 
 class FrontSideSubMenu(Menu):
 	bl_label = "Front Side Menu"
@@ -1156,9 +1244,11 @@ class FrontSideSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Front Side 1")
 		bone1.name='R_FrontSide1'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Front Side 2")
 		bone2.name='R_FrontSide2'
+		bone2.symmetry=True
 
 class RearSideSubMenu(Menu):
 	bl_label = "Rear Side Menu"
@@ -1169,9 +1259,11 @@ class RearSideSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Rear Side 1")
 		bone1.name='R_RearSide1'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Rear Side 2")
 		bone2.name='R_RearSide2'
+		bone2.symmetry=True
 
 class WheelWellSubMenu(Menu):
 	bl_label = "Rear Side Menu"
@@ -1182,9 +1274,11 @@ class WheelWellSubMenu(Menu):
 		
 		bone1 = layout.operator("object.generate_rig", text = "Width")
 		bone1.name='R_Wheel_Well_Width'
+		bone1.symmetry=True
 
 		bone2 = layout.operator("object.generate_rig", text = "Position")
 		bone2.name='Wheel_Well_Position'
+		bone2.symmetry=False
 
 class SelectBonesMenu(Menu):
 	bl_idname = "OBJECT_MT_select_bones_menu"

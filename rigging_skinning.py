@@ -46,6 +46,7 @@ class GenerateRig (Operator):
 	bl_description = "Add Car Body Bones"
 	bl_options = {'REGISTER', 'UNDO'}	
 	name : bpy.props.StringProperty(name="Name")
+	symmetry : bpy.props.BoolProperty(name="Symmetry", default=False)
 	
 	@classmethod
 	def poll(cls, context):
@@ -87,19 +88,27 @@ class GenerateRig (Operator):
 			new_bone.length = 0.1
 
 		ops.armature.select_linked()
-		ops.armature.select_all(action='DESELECT')	
+		ops.armature.select_all(action='DESELECT')
 
 		# parenting
 		new_bone.select = True
 		root.select = True
 		object.data.edit_bones.active = root
-		ops.armature.select_linked()				
+		ops.armature.select_linked()		
 		ops.armature.parent_set(type='OFFSET')
 
-		# new bone selection
+		# select new bone 
 		ops.armature.select_all(action='DESELECT')
 		new_bone.select = True
 		ops.armature.select_linked()
+
+		# symmetry
+		if self.symmetry is True:
+			bpy.ops.transform.translate(value=(-150, 0, 0), orient_type='GLOBAL')
+			bpy.ops.armature.symmetrize(direction='NEGATIVE_X')
+			object.data.edit_bones[-1].select = True
+			new_bone.select = True
+			
 
 		#if auto sync
 		if bpy.context.scene.auto_add_vertex_group:
@@ -428,18 +437,41 @@ class ShiftVertexWeights(Operator):
 
 		return {'FINISHED'}
 
+#class VertexAssignController(Operator):
+#	bl_idname = "view3d.vert_assign_controller"
+#	bl_label = "Vert Assign Controller"
+#	bl_options = {'REGISTER', 'UNDO'}
+#	mode: bpy.props.StringProperty(options={'HIDDEN'})
+	
+#	def execute(self, context):
+#		if self.mode == 'ADD':
+#			bpy.context.scene.vert_assign_mode_enum = 'ADD'
+#		elif self.mode == 'SUBTRACT':
+#			bpy.context.scene.vert_assign_mode_enum = 'SUBTRACT'
+#		else:
+#			bpy.context.scene.vert_assign_mode_enum = 'REPLACE'	
+
+#		return {'FINISHED'}
+
 class FillActiveVG(Operator):
 	bl_idname = "object.fill_active_vg"
-	bl_label = "Fill Active"
-	bl_description = "[Sel]: Fill selected vertices [Act]: Fill Active Vertex Group"
+	bl_label = "Assign Weight"
+	bl_description = "Assign weight to selected vertices"
 	bl_options = {'REGISTER', 'UNDO'}
-	only_selected: bpy.props.BoolProperty(options={'HIDDEN'})
+	mode: bpy.props.StringProperty(options={'HIDDEN'})
 
 	@classmethod
 	def poll(cls, context):
 		return _class_method_mesh_(cls, context)	 
 	
 	def execute(self, context):
+		if self.mode == 'ADD':
+			bpy.context.scene.vert_assign_mode_enum = 'ADD'
+		elif self.mode == 'SUBTRACT':
+			bpy.context.scene.vert_assign_mode_enum = 'SUBTRACT'
+		else:
+			bpy.context.scene.vert_assign_mode_enum = 'REPLACE'	
+
 		if bpy.context.scene.active_mesh in bpy.data.objects:
 			obj = bpy.data.objects[bpy.context.scene.active_mesh]
 
@@ -452,22 +484,16 @@ class FillActiveVG(Operator):
 			obj = bpy.data.objects[bpy.context.scene.active_mesh]
 			
 			if obj:
-				vg = obj.vertex_groups.active				
+				vg = obj.vertex_groups.active
 				if vg:
 					if vg.lock_weight == False:
-						ind = []
-						
-						if self.only_selected:
-							cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups] and vert.select == True]
-						else:
-							cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups]]
-						
+						ind = []						
+						cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups] and vert.select == True]						
 						for i in cont:
-							ind.append(i.index)					
-						
-						if ind:				
-							for v in ind:							
-								vg.add([v], value, 'REPLACE')
+							ind.append(i.index)
+						if ind:
+							for v in ind:
+								vg.add([v], value, self.mode)
 					else:
 						self.report({'WARNING'}, ('Nothing changed.' + '"' + vg.name + '"' + ' is locked.'))
 
@@ -479,57 +505,57 @@ class FillActiveVG(Operator):
 
 		return {'FINISHED'}
 
-class FillAllVG(Operator):
-	bl_idname = "object.fill_all_vg"
-	bl_label = "Fill All"
-	bl_description = "Fill All Vertex Groups"
-	bl_options = {'REGISTER', 'UNDO'}
+#class FillAllVG(Operator):
+#	bl_idname = "object.fill_all_vg"
+#	bl_label = "Fill All"
+#	bl_description = "Fill All Vertex Groups"
+#	bl_options = {'REGISTER', 'UNDO'}
 
-	@classmethod
-	def poll(cls, context):
-		return _class_method_mesh_(cls, context)
+#	@classmethod
+#	def poll(cls, context):
+#		return _class_method_mesh_(cls, context)
 	
-	def execute(self, context):
-		if bpy.context.scene.active_mesh in bpy.data.objects:
-			obj = bpy.data.objects[bpy.context.scene.active_mesh]
-			mode = bpy.context.mode
-			value = bpy.context.scene.vertex_weight_input			
+#	def execute(self, context):
+#		if bpy.context.scene.active_mesh in bpy.data.objects:
+#			obj = bpy.data.objects[bpy.context.scene.active_mesh]
+#			mode = bpy.context.mode
+#			value = bpy.context.scene.vertex_weight_input			
 
-			if bpy.context.mode != 'OBJECT':
-				bpy.ops.object.mode_set(mode = 'OBJECT')							
+#			if bpy.context.mode != 'OBJECT':
+#				bpy.ops.object.mode_set(mode = 'OBJECT')							
 			
-			if obj:
-				vgs = obj.vertex_groups	
+#			if obj:
+#				vgs = obj.vertex_groups	
 				
-				if vgs:		
-					for vg in vgs:
-						if vg:
-							if vg.lock_weight == False:
-								ind = []
-								cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups]]
+#				if vgs:		
+#					for vg in vgs:
+#						if vg:
+#							if vg.lock_weight == False:
+#								ind = []
+#								cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups]]
 								
-								for i in cont:
-									ind.append(i.index)
+#								for i in cont:
+#									ind.append(i.index)
 
-								if ind:
-									for v in ind:
-										vg.add([v], value, 'REPLACE')
+#								if ind:
+#									for v in ind:
+#										vg.add([v], value, 'REPLACE')
 
-			# original mode
-			go_back_to_initial_mode(self, mode)
+#			# original mode
+#			go_back_to_initial_mode(self, mode)
 		
-		else:
-			self.report({'WARNING'}, 'Skinned Mesh is not found!')	
+#		else:
+#			self.report({'WARNING'}, 'Skinned Mesh is not found!')	
 
-		return {'FINISHED'}
+#		return {'FINISHED'}
 
-	def invoke(self, context, event):
-			return context.window_manager.invoke_confirm(self, event)
+#	def invoke(self, context, event):
+#			return context.window_manager.invoke_confirm(self, event)
 
 class ClampNearZeroValues(Operator):
 	bl_idname = "object.clamp_near_zero_values"
 	bl_label = "Clamp Near Zero Values in All Vertex Groups"
-	bl_description = "Zero out values that less than 0.004 in All Vertex Groups"
+	bl_description = "Zero out values less than 0.004 in All Vertex Groups"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	@classmethod
@@ -540,34 +566,42 @@ class ClampNearZeroValues(Operator):
 		if bpy.context.scene.active_mesh in bpy.data.objects:
 			obj = bpy.data.objects[bpy.context.scene.active_mesh]
 			mode = bpy.context.mode
+
+			bones = get_bones(self)
+			bones_names = []
+			for b in bones:
+				bones_names.append(b.name)
 
 			if bpy.context.mode != 'OBJECT':
 				bpy.ops.object.mode_set(mode = 'OBJECT')			
 
 			if obj:
-				vgs = obj.vertex_groups				
+				vgs = obj.vertex_groups			
 				if vgs:					
-					for vg in vgs:											
-						# vertex indices
-						ind = []
+					for vg in vgs:
+						if vg.name in bones_names:
+							# vertex indices
+							ind = []
 
-						# vertex group's content
-						cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups]]
+							# vertex group's content
+							cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups]]
 						
-						for i in cont:
-							ind.append(i.index)					
+							for i in cont:
+								ind.append(i.index)					
 						
-						if ind:
-							n = 0
-							for v in ind:
-								value = vg.weight(v)													
-								if 0.0 < value < 0.004:
-									vg.add([v], 0.0, 'REPLACE')
-									n += 1						
-							if n > 0:
-								self.report({'INFO'}, (vg.name + ": " + str(n) + " values set to 0.0"))
-							else:
-								self.report({'INFO'}, (vg.name + ": " +  ' Pass'))
+							if ind:
+								n = 0
+								for v in ind:
+									value = vg.weight(v)								
+									if 0.0 < value < 0.004:
+										vg.add([v], 0.0, 'REPLACE')
+										n += 1						
+								if n > 0:
+									self.report({'INFO'}, (vg.name + ": " + str(n) + " values set to 0.0"))
+								#else:
+								#	self.report({'INFO'}, (vg.name + ": " +  ' Pass'))
+						else:
+							self.report({'INFO'}, (vg.name + " missed because it has no bones"))
 
 			# original mode
 			go_back_to_initial_mode(self, mode)
@@ -886,11 +920,12 @@ class SelectActiveMesh (Operator):
 		return {'FINISHED'}
 
 classes = (
+	#VertexAssignController,
 	GenerateRig,	
 	AddArmatureMod,
 	ScaleAllBones,
 	SyncVG,
-	FillAllVG,
+	#FillAllVG,
 	FillActiveVG,
 	DrawBrushBlendToggle,
 	DrawBrushTemplateSettings1,
@@ -1002,6 +1037,17 @@ def add_armature(cls):
 		armature = bpy.data.objects['Armature'].data
 		armature.show_names = True		
 		armature.bones[0].name = 'Root'
+
+		# set 1.0 to Root
+		if bpy.context.scene.active_mesh in bpy.data.objects:
+			mesh = bpy.context.scene.active_mesh
+			bpy.ops.object.sync_vg()
+
+
+			bpy.context.scene.tool_settings.vertex_group_weight = 1
+			bpy.ops.mesh.select_all(action='SELECT')
+			bpy.ops.object.vertex_group_assign()
+
 	else:
 		cls.report({'WARNING'}, ("Armature already exists"))
 
@@ -1060,7 +1106,6 @@ def _class_method_mesh_and_armature_(cls, context):
 			if armature.hide_get() == False and armature.hide_select == False and armature.hide_viewport == False and mesh.hide_get() == False and mesh.hide_select == False and mesh.hide_viewport == False:
 				return True
 
-
 def register():
 	for cls in classes:
 		bpy.utils.register_class(cls)
@@ -1107,21 +1152,29 @@ def register():
 		description = "Select Weight Paint Mode",
 		default = False
 		)
+
 	bpy.types.Scene.pose_on_off = bpy.props.BoolProperty(
 		name="POSE",
 		description = "Select Pose Mode",
 		default = False
 		)
+
 	bpy.types.Scene.edit_on_off = bpy.props.BoolProperty(
 		name="EDIT",
 		description = "Select Edit Mode",
 		default = False
 	)
 
+	bpy.types.Scene.vert_assign_mode_enum = bpy.props.EnumProperty(
+	name="",
+	description="Vertex Assign Mode",
+	items=[('ADD', 'ADD', ''), ('SUBTRACT', 'SUBTRACT', ''), ('REPLACE', 'REPLACE', '')]
+	)
+
 def unregister():
 	for cls in reversed(classes):
 		bpy.utils.unregister_class(cls)
-	
+	bpy.types.Scene.vert_assign_mode_enum 	
 	bpy.types.Scene.bone_length
 	bpy.types.Scene.vertex_weight_input
 	bpy.types.Scene.active_mesh

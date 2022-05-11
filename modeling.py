@@ -658,22 +658,25 @@ class LightsUnwrap(Operator):
 		return context.mode == "EDIT_MESH"
 
 	def execute(self, context):
-		
+		if_sync_select = bpy.context.scene.tool_settings.use_uv_select_sync
+
 		if bpy.context.active_object:                       
 			bpy.context.area.type = 'IMAGE_EDITOR'
 
 			bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
 			bpy.context.area.ui_type = 'UV'
 
-			if not bpy.context.scene.tool_settings.use_uv_select_sync:
-				bpy.context.scene.tool_settings.use_uv_select_sync  = True
+			if not if_sync_select:
+				bpy.context.scene.tool_settings.use_uv_select_sync  = True				
 
 			bpy.context.space_data.cursor_location[0] = self.U
 			bpy.context.space_data.cursor_location[1] = self.V        
 
 			bpy.ops.uv.snap_selected(target='CURSOR')
 			
-			bpy.context.area.type = 'VIEW_3D'
+			bpy.context.area.type = 'VIEW_3D'			
+			
+			bpy.context.scene.tool_settings.use_uv_select_sync  = if_sync_select
 
 		return {'FINISHED'}
 
@@ -1975,7 +1978,7 @@ class EdgeToCurve(Operator):
 		return {'FINISHED'}
 
 class VertexPaintrFill(Operator):
-	bl_idname = "object.fill_vertex_color"
+	bl_idname = "mesh.fill_vertex_color"
 	bl_label = "Fill Vertex Color"
 	bl_description = "Fill Vertex Color"
 	bl_options = {'REGISTER', 'UNDO'}
@@ -2088,6 +2091,99 @@ class VertexPaintrFill(Operator):
 	def execute(self, context):	
 		self.replace_vertex_color(context)
 		return {'FINISHED'}
+
+	############
+class VertexColorChannelOnOff(Operator):
+	bl_idname = "mesh.channel_on_off"
+	bl_label = "Channel On/Off"
+	bl_description = "Channel On/Off"
+	bl_options = {'REGISTER', 'UNDO'}
+	action: bpy.props.FloatProperty(options = {'HIDDEN'})
+	
+	@classmethod
+	def poll(cls, context):
+		return context.active_object and context.mode == 'EDIT_MESH'		
+
+	def execute(self, context):		
+		sel = [obj for obj in bpy.context.selected_objects if obj.type != "EMPTY"]
+		mode = bpy.context.mode
+		if len(sel) > 0:
+			for o in sel:
+				bpy.context.view_layer.objects.active = o
+				obj = o.data
+				bpy.ops.object.mode_set(mode = 'VERTEX_PAINT')
+
+				if_replace = bpy.context.scene.replace_vertex_paint_value
+				fill_polygon = bpy.context.scene.fill_vertex_paint
+				alpha_value = bpy.context.scene.vertex_color_alpha_value
+				replace = bpy.context.scene.color_replace
+
+				if if_replace and fill_polygon:
+					bpy.context.scene.fill_vertex_paint = False
+					fill_polygon = bpy.context.scene.fill_vertex_paint
+				
+
+				to_replace = None
+
+				if replace == 'R':
+					to_replace = 0
+
+				elif replace == 'G':
+					to_replace = 1
+
+				elif replace == 'B':
+					to_replace = 2
+					
+				if if_replace == False:
+					verts = [v for v in obj.vertices if v.select]
+				else:
+					verts = [v for v in obj.vertices]
+				
+				if if_replace:
+					if fill_polygon is False:
+						for polygon in obj.polygons:
+							for v in verts:
+								for i, index in enumerate(polygon.vertices):
+									if v.index == index:
+										loop_index = polygon.loop_indices[i]
+										#zero out channel
+										if to_replace is not None:
+											r = obj.vertex_colors.active.data[loop_index].color[0]
+											g = obj.vertex_colors.active.data[loop_index].color[1]
+											b = obj.vertex_colors.active.data[loop_index].color[2]
+
+											obj.vertex_colors.active.data[loop_index].color[to_replace] =  self.action		
+
+
+					else:
+						self._fill_polygon_(obj, replace_with)
+				else:
+					# alpha
+					if fill_polygon is False:
+						for polygon in obj.polygons:
+							for v in verts:
+								for i, index in enumerate(polygon.vertices):
+									if v.index == index:
+										loop_index = polygon.loop_indices[i]
+										if self.color_new != "A":
+											obj.vertex_colors.active.data[loop_index].color = replace_with
+										else:
+											obj.vertex_colors.active.data[loop_index].color[3] = alpha_value
+					else:
+						self._fill_polygon_(obj, replace_with)
+
+				bpy.ops.object.mode_set(mode = 'EDIT')
+				bpy.ops.mesh.select_all(action='DESELECT')
+		else:
+			self.report({'WARNING'},  "Nothing changed!")
+		go_back_to_initial_mode(self, mode)
+		return {'FINISHED'}
+
+
+		
+
+
+	############
 
 class CopyObjectName(Operator):
 
@@ -2468,7 +2564,8 @@ classes = (
 	ReplaceMaterials,
 	CreateCollection,
 	ReplaceMaterialsGetter,
-	ReplaceMaterialsAdder
+	ReplaceMaterialsAdder,
+	VertexColorChannelOnOff
 )
 
 # Register
@@ -2484,6 +2581,7 @@ def register():
 
 	bpy.types.Scene.replace_vertex_paint_value = bpy.props.BoolProperty(description = 'Replace Vertex Color Mode')
 	bpy.types.Scene.fill_vertex_paint = bpy.props.BoolProperty(description = 'Fill Polygons. Fill Vertices is default')
+
 	bpy.types.Scene.color_replace = bpy.props.EnumProperty(
 	name="",
 	description="Select color to replace",

@@ -10,7 +10,7 @@ class StandardBatchExport(Operator):
    
 	bl_idname = "object.standard_batch_export"
 	bl_label = "Standard Batch Export"
-	bl_description = "Standard Automation Batch Exporter. Requires object selection. Exports Mesh, Armature, Empty object types. Fbx files get their names from the meshes"
+	bl_description = "Standard Automation Batch Exporter. Requires object selection. Exports Mesh, Armature, Empty object types. Exported files are named as the scene meshes. Note that it does not fix mirrored triangulation"
 	
 	@classmethod
 	def poll(cls, context):
@@ -18,7 +18,18 @@ class StandardBatchExport(Operator):
 
 	# main export function
 	def exp(self, obj_name, file_path):		
-		bpy.ops.export_scene.fbx(filepath=(file_path + "/" + obj_name + ".fbx"), check_existing=False, use_selection=True, object_types={'EMPTY','ARMATURE','MESH'}, bake_anim=False, axis_forward='Y', axis_up='Z', add_leaf_bones=False, use_custom_props=True, mesh_smooth_type='EDGE')
+		bpy.ops.export_scene.fbx(
+		filepath=(file_path + "/" + obj_name + ".fbx"), 
+		check_existing=False,
+		use_selection=True,
+		object_types={'EMPTY','ARMATURE','MESH'}, 
+		bake_anim=False,
+		axis_forward='Y',
+		axis_up='Z',
+		add_leaf_bones=False,
+		use_custom_props=True,
+		mesh_smooth_type='EDGE'
+	   )
 
 	def execute(self, context):
 		file_path = bpy.context.scene.export_path
@@ -66,10 +77,20 @@ class StandardBatchExport(Operator):
 						# check file writing permissions						
 						if os.access(file, os.W_OK) or os.access(file, os.F_OK):
 							os.chmod(file, 0o744)
+						
+						#if offset
+						if 'offset_x' in i:
+							bpy.ops.transform.translate(value=(i['offset_x'], 0, 0))			
+							
 						# export
 						self.exp(i.name, file_path)
+
+						if 'offset_x' in i:
+							bpy.ops.transform.translate(value=(-(i['offset_x']), 0, 0))
+
 						self.report({'INFO'},  file_path + i.name + ".fbx")
 						o.select_all(action='DESELECT')
+
 
 				
 					# Back to original selection
@@ -86,7 +107,7 @@ class StandardBatchExport(Operator):
 class BodyExport(Operator):
 	bl_idname = "object.body_export"
 	bl_label = "Body Export"
-	bl_description = "Export the Car Body with its Boundboxes located inside their own collection named as a future fbx file. Select the body collection in Outliner ant press [Export Single]. Armature should be in the root Scene Collection only"
+	bl_description = "Export Car Body with its Boundboxes located inside their own collection named as a future fbx file. Select the body collection in Outliner ant press [Export Single]. Armature should be in the root Scene Collection only"
 	bl_options = {'REGISTER', 'UNDO'}
 
 	@classmethod
@@ -527,7 +548,7 @@ class GetSelectedObjectsNames (Operator):
 class FixturesExport(Operator):   
 	bl_idname = "object.fixture_export"
 	bl_label = "Fixtures Export"
-	bl_description = "Non-destructive Fixtures Export. Select a parent Fixtures Collection and press Export Single"
+	bl_description = "Non-destructive Fixtures Export. Select a Fixture Collection in the Outliner and run the script"
 	
 	@classmethod
 	def poll(cls, context):
@@ -667,9 +688,9 @@ class FixturesExport(Operator):
 									if copy_to_delete not in content:
 										bpy.data.objects.remove(copy_to_delete, do_unlink=True)
 					else:
-						self.report({'WARNING'}, 'Select a Fixture Collection to export')
+						self.report({'WARNING'}, 'Select the Master Fixture Collection to export all fixture parts')
 				else:
-					self.report({'WARNING'}, 'Fixtures Parent Collection is not found or selected!')
+					self.report({'WARNING'}, 'Master Fixture Collection not found or not active!')
 		else:
 			self.report({'WARNING'}, 'The directory is not valid! Try selecting it again with Relative Path unchecked in the Blender File Dialog settings')
 		return {'FINISHED'}
@@ -686,6 +707,139 @@ class FixturesBatchExport(Operator):
 
 	def execute(self, context):	
 		batch_export(self, context, 'Fixture')
+		return {'FINISHED'}
+
+class FixturesExportObjectSelected(Operator):
+	bl_idname = "object.selected_fixtures_batch_export"
+	bl_label = "Non-destructive Selected Fixtures Batch Export"
+	bl_description = "Non-destructive Selected Fixtures Batch Export. Select mesh(es) in Object mode and run the script"
+	
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def export(self, name, file_path):
+		bpy.ops.export_scene.fbx(
+		filepath=(file_path + "/" + name + ".fbx"),
+		use_active_collection=False,
+		check_existing=False,
+		use_selection=True,
+		object_types={'MESH', 'ARMATURE'},
+		global_scale=1.0,
+		axis_forward='-Y',
+		axis_up='Z',
+		primary_bone_axis='Y',
+		secondary_bone_axis='X',
+		add_leaf_bones=False,
+		apply_unit_scale=True,
+		mesh_smooth_type='EDGE',
+		use_tspace=False,
+		use_mesh_modifiers=False
+		)
+
+	def execute(self, context):
+		file_path = bpy.context.scene.export_path
+		ao = bpy.context.active_object
+		ops = bpy.ops.object
+		data = bpy.data.objects
+
+		forced_object_mode(self, context, context.object)
+		
+		# if directory exists
+		if  os.path.exists(file_path):
+			
+			o = bpy.ops.object
+			c = bpy.context
+			sel = bpy.context.selected_objects	
+
+			if sel:
+				if c.object.type == "MESH" and c.active_object.mode == 'OBJECT':				 
+					sel = bpy.context.selected_objects
+					o.select_all(action='DESELECT')
+					
+					for i in sel:
+						i.select_set(True)
+						bpy.context.view_layer.objects.active = i			
+			
+			if bpy.context.selected_objects:
+				bpy.ops.object.select_all(action='DESELECT')				
+				
+				content = [i for i in sel if i.type == 'MESH']			
+				fixture_copies = []
+				
+				if content:
+					bpy.ops.object.select_all(action='DESELECT')						
+					# start applying modifiers						
+					for fixture in content:
+						# copy
+						fixture_copies.append(duplicate(self, context, fixture))									
+
+				if len(fixture_copies) > 0:
+					# check if no None fixtures
+					none_check = [i for i in fixture_copies if i is not None]
+					if len(fixture_copies) == len(none_check):
+						for fixture_copy in fixture_copies:
+							bpy.ops.object.select_all(action='DESELECT')
+							fixture_copy.select_set(True)
+							bpy.context.view_layer.objects.active = fixture_copy
+
+							if fixture_copy.data.shape_keys is None:
+								if len(fixture_copy.modifiers) > 0 and fixture_copy.type == 'MESH':
+									# fix mirrored triangulation				
+									if 'Mirror' in fixture_copy.modifiers:
+										# get half
+										indices = get_faces_indices(self, fixture_copy)
+										bpy.ops.object.modifier_apply(modifier = 'Mirror')								
+										fix_mirrored_half_triangulation(self, fixture_copy, indices)
+
+									do_not_apply = ('ARMATURE')
+									# apply other modifiers except for armature								
+									for m in fixture_copy.modifiers:
+										if m.type not in do_not_apply:
+											bpy.ops.object.modifier_apply(modifier = m.name)
+								else:
+									self.report({'WARNING'}, self.bl_label + ": " + "Fixtures can't have shape keys! Export failed")
+						
+						# export
+						bpy.ops.object.select_all(action='DESELECT')
+						for fixture_copy in fixture_copies:
+							fixture_copy.select_set(True)
+
+							bpy.context.view_layer.objects.active = fixture_copy
+							full_name = fixture_copy.name[:-4] + '.fbx'
+
+							armature = get_armature(self, fixture_copy)					
+							if armature is not None:
+								armature.select_set(True)
+						
+							if file_path:
+								if os.access(full_name, os.W_OK) or os.access(full_name, os.F_OK):
+									os.chmod(full_name, 0o744)				
+								
+								self.export(full_name, file_path)
+								self.report({'INFO'}, full_name)		
+								bpy.ops.object.select_all(action='DESELECT')
+
+							else:
+								self.report({'WARNING'}, 'Export path is not valid!')
+
+						for obj in sel:
+							obj.select_set(True)
+						bpy.context.view_layer.objects.active = ao
+
+					else:
+						self.report({'WARNING'}, self.bl_label + ": " + "Fixture not found or locked/hidden.")
+				else:
+					self.report({'WARNING'}, 'Content of Fixtures Collection not found!')
+				
+				#cleanup							
+				for copy_to_delete in fixture_copies:					
+					bpy.data.objects.remove(copy_to_delete, do_unlink=True)
+
+			else:
+				self.report({'WARNING'}, 'Nothing selected')
+		else:
+			self.report({'WARNING'}, 'The directory is not valid! Try selecting it again with Relative Path unchecked in the Blender File Dialog settings')
 		return {'FINISHED'}
 
 class HierarchyExport(Operator):
@@ -1293,6 +1447,7 @@ def batch_export(cls, context, export_type):
 			cls.report({'WARNING'}, 'Parent Collection cannot not be the Scene Collection!')
 	else:
 		cls.report({'WARNING'}, 'Parent Collection not found!')
+
 def forced_object_mode(cls, context, obj):
 	if context.mode != 'OBJECT':
 		noedit_types = ['EMPTY','VOLUME','LIGHT','LIGHT_PROBE','CAMERA','SPEAKER']
@@ -1301,6 +1456,7 @@ def forced_object_mode(cls, context, obj):
 
 classes = (
 	StandardBatchExport,
+	FixturesExportObjectSelected,
 	BodyExport,
 	BodiesBatchExport,
 	RimExport,
