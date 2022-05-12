@@ -77,9 +77,6 @@ class ActiveMeshPanel(Panel):
 		split = column.split(factor=0.75, align=True)
 		split.prop(bpy.context.scene, 'active_mesh')
 
-		if 'Armature' in context.object.modifiers:
-			column.template_ID(bpy.context.object.modifiers['Armature'], "object")
-
 		split.operator("object.pick_active_mesh", icon='EYEDROPPER')
 		column.operator("object.add_armature_mod", text = "Add [Armature] [Modifier]")
 		column.operator(SelectActiveMesh.bl_idname, text = "Select").mode='EDIT'

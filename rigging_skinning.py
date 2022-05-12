@@ -1045,7 +1045,9 @@ def add_armature(cls):
 
 
 			bpy.context.scene.tool_settings.vertex_group_weight = 1
-			bpy.ops.mesh.select_all(action='SELECT')
+			if bpy.context.mode == 'OBJECT':
+				bpy.ops.object.mode_set(mode = 'EDIT')
+				bpy.ops.mesh.select_all(action='SELECT')
 			bpy.ops.object.vertex_group_assign()
 
 	else:
