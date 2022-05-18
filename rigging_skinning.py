@@ -24,8 +24,8 @@ class DrawBrushBlendToggle(Operator):
 			if obj and obj.type == 'MESH':
 				if bpy.context.mode != 'PAINT_WEIGHT':				
 					bpy.ops.object.weight_paint_mode_on()
-				else:
-					lock_and_select(self, obj)
+				#else:
+				#	lock_and_select(self, obj)
 
 				bpy.ops.wm.tool_set_by_id(name="builtin_brush.Draw")
 				draw_brush = bpy.data.brushes["Draw"]
@@ -181,9 +181,9 @@ class SyncVG (Operator):
 	bl_description = "Add Vertex Groups named as Bones"
 	bl_options = {'REGISTER', 'UNDO'}
 
-	#@classmethod
-	#def poll(cls, context):
-	#	return _class_method_mesh_and_armature_(cls, context)
+	@classmethod
+	def poll(cls, context):
+		return _class_method_armature_(cls, context)
 	
 	def execute(self, context):
 		mode = bpy.context.mode	
@@ -215,16 +215,16 @@ class SyncVG (Operator):
 						vg[-1].name = b.name
 						k += 1
 						
-						#assign zero weight 
-						weight = bpy.context.scene.tool_settings.vertex_group_weight
-						bpy.context.scene.tool_settings.vertex_group_weight = 0
-						bpy.ops.object.mode_set(mode = 'EDIT')
+						##assign zero weight 
+						#weight = bpy.context.scene.tool_settings.vertex_group_weight
+						#bpy.context.scene.tool_settings.vertex_group_weight = 0
+						#bpy.ops.object.mode_set(mode = 'EDIT')
 
-						obj.vertex_groups.active = vg[-1]
+						#obj.vertex_groups.active = vg[-1]
 
-						bpy.ops.mesh.select_all(action='SELECT')
-						bpy.ops.object.vertex_group_assign()
-						bpy.context.scene.tool_settings.vertex_group_weight = weight
+						#bpy.ops.mesh.select_all(action='SELECT')
+						#bpy.ops.object.vertex_group_assign()
+						#bpy.context.scene.tool_settings.vertex_group_weight = weight
 														
 				# lock unused
 				if bpy.context.scene.lock_all_unused_vgs:
