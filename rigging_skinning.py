@@ -48,26 +48,40 @@ class GenerateRig (Operator):
 	name : bpy.props.StringProperty(name="Name")
 	symmetry : bpy.props.BoolProperty(name="Symmetry", default=False)
 	
+	#@classmethod
+	#def poll(cls, context):
+	#	return _class_method_mesh_and_armature_(cls, context)
+
 	@classmethod
 	def poll(cls, context):
-		return _class_method_mesh_and_armature_(cls, context)
+		if bpy.context.object is not None:
+			return True
 	
 	def execute(self, context):	
 		ops = bpy.ops
-		#object = bpy.context.object
+		obj = bpy.context.object
 		data = bpy.data.objects
 		scene = bpy.context.scene
 		context = bpy.context
+		sel = bpy.context.selected_objects
 		
+		if  len(sel) > 1:
+			for o in sel:
+				if o.type == 'ARMATURE':
+					o.select_set(False)
+		obj = bpy.context.selected_objects[0]
+
+
 		armature = None
-		if "Armature" not in data:
-			# create a new Armature
+		if 'Armature' not in obj.modifiers or obj.modifiers['Armature'].object is None:
 			add_armature(self)
-		else:			
-			data['Armature'].select_set(True)
-			bpy.context.view_layer.objects.active = data['Armature']
+			armature = bpy.context.scene.objects[-1]
 		
-		armature = data['Armature']
+		armature = obj.modifiers['Armature'].object
+
+		armature.select_set(True)
+		bpy.context.view_layer.objects.active = armature		
+		
 		object = armature
 		ops.object.mode_set(mode = 'EDIT')
 		
@@ -108,18 +122,20 @@ class GenerateRig (Operator):
 			bpy.ops.armature.symmetrize(direction='NEGATIVE_X')
 			object.data.edit_bones[-1].select = True
 			new_bone.select = True
-			
-
+		
 		#if auto sync
-		if bpy.context.scene.auto_add_vertex_group:
-			ops.object.sync_vg()
+		if bpy.context.scene.auto_add_vertex_group:	
 			ops.object.object_edit_mode_on(mode="OBJECT")
-			ops.object.select_all(action='DESELECT')
-			
-			#back to the new bone selection
-			armature.select_set(True)
-			context.view_layer.objects.active = armature
-			ops.object.object_edit_mode_on(mode="EDIT")
+			ops.object.select_all(action='DESELECT')			
+			obj.select_set(True)			
+			context.view_layer.objects.active = obj
+			ops.object.sync_vg()		
+
+		#back to the new bone selection
+		context.view_layer.objects.active = armature
+		armature.select_set(True)
+		context.view_layer.objects.active = armature
+		ops.object.object_edit_mode_on(mode="EDIT")
 
 		return {'FINISHED'}
 
@@ -127,14 +143,16 @@ class AddArmatureMod (Operator):
 	bl_idname = "object.add_armature_mod"
 	bl_label = "Add Armature Modifier"
 	bl_description = "Add Armature and/or Armature Modifier"
-	bl_options = {'REGISTER', 'UNDO'}	
+	bl_options = {'REGISTER', 'UNDO'}
+	name: bpy.props.StringProperty(options={'HIDDEN'})
+	bl_description = "Add Armature and Armature modifier to the selected mesh"
 
 	@classmethod
 	def poll(cls, context):
-		return bpy.context.scene.active_mesh !=''
+		return bpy.context.object is not None
 
-	def execute(self, context):		
-		add_armature_modifier(self)
+	def execute(self, context):
+		add_armature(self)
 		return {'FINISHED'}
 
 class ScaleAllBones (Operator):
@@ -145,20 +163,15 @@ class ScaleAllBones (Operator):
 	
 	@classmethod
 	def poll(cls, context):
-		return _class_method_armature_(cls, context)	
+		return bpy.context.object is not None and bpy.context.object.type =='ARMATURE'	
 	
-	def execute(self, context):
-		if "Armature" in bpy.data.objects:			
-			length = bpy.context.scene.bone_length
-			armature = bpy.data.objects['Armature']
-			armature.select_set(True)
-			bpy.context.view_layer.objects.active = armature
-			
-			if bpy.context.object.type=='ARMATURE':
-				bpy.ops.object.mode_set(mode = 'EDIT')			
-				bones = armature.data.edit_bones
-				for bone in bones:
-					bone.length = length*100
+	def execute(self, context):		
+		length = bpy.context.scene.bone_length
+		bpy.ops.object.mode_set(mode = 'EDIT')			
+		bones = context.object.data.edit_bones
+		for bone in bones:
+			bone.length = length * 100
+		bpy.ops.object.mode_set(mode = 'OBJECT')
 
 		return {'FINISHED'}
 
@@ -168,60 +181,65 @@ class SyncVG (Operator):
 	bl_description = "Add Vertex Groups named as Bones"
 	bl_options = {'REGISTER', 'UNDO'}
 
-	@classmethod
-	def poll(cls, context):
-		return _class_method_mesh_and_armature_(cls, context)
+	#@classmethod
+	#def poll(cls, context):
+	#	return _class_method_mesh_and_armature_(cls, context)
 	
 	def execute(self, context):
-		mode = bpy.context.mode
-		if "Armature" in bpy.data.objects:
-			armature = bpy.data.objects['Armature']
-			if bpy.context.scene.active_mesh in bpy.data.objects:
-				obj = bpy.data.objects[bpy.context.scene.active_mesh]
+		mode = bpy.context.mode	
+		obj = bpy.context.object
+		bpy.ops.object.select_all(action='DESELECT')
+		bpy.ops.object.object_edit_mode_on(mode="OBJECT")
+		if obj and obj.hide_get() == False and obj.hide_select == False and obj.hide_viewport == False:
+			if obj.type =='MESH':				
+				bpy.ops.object.mode_set(mode = 'OBJECT')
+					
+				bones_list = get_bones(self)
 
-				if obj and obj.hide_get() == False and obj.hide_select == False and obj.hide_viewport == False:
-					if obj.type=='MESH':	
-						bpy.ops.object.mode_set(mode = 'OBJECT')
+				#add vertex groups
+				obj.select_set(True)
+				bpy.context.view_layer.objects.active = obj
 						
-						bones_list = get_bones(self)
+				#sync
+				vg = obj.vertex_groups
+				vg_names = []
+				for v in vg:
+					vg_names.append(v.name)				
 
-						#add vertex groups
-						obj.select_set(True)
-						bpy.context.view_layer.objects.active = obj
-						
-						#sync
+				k = 0
+				for b in bones_list:						
+					if b.name not in vg_names:								
+						bpy.ops.object.vertex_group_add()
 						vg = obj.vertex_groups
-						vg_names = []
-						for v in vg:
-							vg_names.append(v.name)				
+						#rename							
+						vg[-1].name = b.name
+						k += 1
+						
+						#assign zero weight 
+						weight = bpy.context.scene.tool_settings.vertex_group_weight
+						bpy.context.scene.tool_settings.vertex_group_weight = 0
+						bpy.ops.object.mode_set(mode = 'EDIT')
 
-						k = 0
-						for b in bones_list:						
-							if b.name not in vg_names:								
-								bpy.ops.object.vertex_group_add()
-								vg = obj.vertex_groups
-								#rename							
-								vg[-1].name = b.name
-								k += 1					
+						obj.vertex_groups.active = vg[-1]
+
+						bpy.ops.mesh.select_all(action='SELECT')
+						bpy.ops.object.vertex_group_assign()
+						bpy.context.scene.tool_settings.vertex_group_weight = weight
 														
-						# lock unused
-						if bpy.context.scene.lock_all_unused_vgs:
-							lock_unused(self, obj)
+				# lock unused
+				if bpy.context.scene.lock_all_unused_vgs:
+					lock_unused(self, obj)
 
-						if k > 0:
-							self.report({'INFO'}, (str(k) + " Vertex Group(s) added."))
-						else:
-							self.report({'INFO'}, 'Nothing changed.')
-
-						go_back_to_initial_mode(self, mode)
-
-						set_properties_to_data(self)
+				if k > 0:
+					self.report({'INFO'}, (str(k) + " Vertex Group(s) added."))
 				else:
-					self.report({'WARNING'}, 'Skinned Mesh is hidden or locked!')
-			else:
-				self.report({'WARNING'}, 'Skinned Mesh not found!')
+					self.report({'INFO'}, 'Nothing changed.')
+
+				go_back_to_initial_mode(self, mode)
+
+				set_properties_to_data(self)
 		else:
-			self.report({'WARNING'}, 'Armature not found!')
+			self.report({'WARNING'}, 'Skinned Mesh is hidden or locked!')
 
 		return {'FINISHED'}
 
@@ -230,59 +248,52 @@ class SelectBonesAndMode(Operator):
 	bl_label = "Select Bone"
 	bl_description = "Fast Bone Selection in Edit/Pose/Weight Paint modes."
 	bl_options = {'REGISTER', 'UNDO'}
-	name: bpy.props.StringProperty(options = {'HIDDEN'})
-	
+	name: bpy.props.StringProperty(options = {'HIDDEN'})	
+
 	@classmethod
 	def poll(cls, context):
 		return _class_method_mesh_and_armature_(cls, context)
 
 	def execute(self, context):
-		update_selection(self)
-		if "Armature" in bpy.data.objects:			
-			
-			wp = bpy.context.scene.weight_paint_on_off		
-			pose = bpy.context.scene.pose_on_off
-			edit = bpy.context.scene.edit_on_off
-			
-			arm_obj = bpy.data.objects['Armature']
-			armature = arm_obj.data	
-			bones = get_bones(self)
-			bone_count = len(bones)
+		obj = bpy.data.objects[bpy.context.scene.active_mesh]
+		bpy.context.view_layer.objects.active = obj
 
-			bones_names = []
-			for b in bones:
-				bones_names.append(b.name)
+		wp = bpy.context.scene.weight_paint_on_off		
+		pose = bpy.context.scene.pose_on_off
+		edit = bpy.context.scene.edit_on_off
 			
-			update_selection(self)
-			# bpy.ops.object.object_edit_mode_on(mode='EDIT')
+		arm_obj = bpy.data.objects[bpy.context.scene.active_mesh].modifiers['Armature'].object
+		armature = arm_obj.data
+		bones = get_bones(self)
+		bone_count = len(bones)
+
+		bones_names = []
+		for b in bones:
+			bones_names.append(b.name)
 			
-			# make sure the armature is selected			
-			bpy.context.view_layer.objects.active = arm_obj
-			bpy.ops.object.object_edit_mode_on(mode="EDIT")
+		name = self.name
+		if name and bones_names:							
+			if name in bones_names:
+				# make sure armature selected
+				bpy.context.view_layer.objects.active = arm_obj
+				bpy.ops.object.object_edit_mode_on(mode="EDIT")
+				bpy.ops.armature.select_all(action='DESELECT')
+				bone = armature.edit_bones[name]
+				bone.select = True
+				armature.edit_bones.active = bone
+				update_selection(self)
+			else:
+				self.report({'WARNING'}, (name + ' not found!'))
 
-			name = self.name
-			if name and bones_names:
-				update_selection(self)				
-				if name in bones_names:
-					# make sure armature selected
-					bpy.context.view_layer.objects.active = bpy.data.objects['Armature']
-					bpy.ops.armature.select_all(action='DESELECT')
-
-					bone = armature.edit_bones[name]
-					bone.select = True
-					armature.edit_bones.active = bone
-					update_selection(self)					
-					bpy.ops.armature.select_linked()
-					if wp:
-						bpy.ops.object.weight_paint_mode_on()
-					elif pose:
-						bpy.ops.object.pose_mode_on()
-					if edit:						
-						bpy.ops.object.object_edit_mode_on(mode="EDIT")
+		bpy.ops.armature.select_linked()
+		if wp:
+			bpy.ops.object.weight_paint_mode_on()			
+		elif pose:
+			bpy.ops.object.pose_mode_on()				
+		if edit:						
+			bpy.ops.object.object_edit_mode_on(mode="EDIT")			
 					
-					set_properties_to_data(self)
-				else:
-					self.report({'WARNING'}, (name + ' not found!'))
+		set_properties_to_data(self)
 									
 
 		return {'FINISHED'}
@@ -306,12 +317,12 @@ class SelectVGtoBone(Operator):
 			if bpy.data.objects[obj].vertex_groups:
 				name = bpy.data.objects[obj].vertex_groups.active.name
 				
-				if "Armature" in bpy.data.objects:					
+				if "Armature" in context.object.modifiers:					
 					wp = bpy.context.scene.weight_paint_on_off		
 					pose = bpy.context.scene.pose_on_off
 					edit = bpy.context.scene.edit_on_off
 
-					arm_obj = bpy.data.objects['Armature']
+					arm_obj = context.object.modifiers['Armature'].object
 					armature = arm_obj.data	
 					bones = get_bones(self)
 					bone_count = len(bones)
@@ -331,7 +342,7 @@ class SelectVGtoBone(Operator):
 						update_selection(self)				
 						if name in bones_names:
 							# make sure armature selected
-							bpy.context.view_layer.objects.active = bpy.data.objects['Armature']
+							bpy.context.view_layer.objects.active = arm_obj
 							bpy.ops.armature.select_all(action='DESELECT')
 
 							bone = armature.edit_bones[name]
@@ -360,7 +371,7 @@ class SelectVGtoBone(Operator):
 class StateEditPoseWPButtons (Operator):
 	bl_idname = "scene.state_edit_pose_wp_buttons"
 	bl_label = "Mode"
-	bl_description = "Pin Mode"
+	bl_description = "Pin Mode. Requires Active Mesh picked"
 	bl_options = {'REGISTER', 'UNDO'}
 	wp_on: bpy.props.BoolProperty(options={'HIDDEN'})
 	pose_on: bpy.props.BoolProperty(options={'HIDDEN'})
@@ -380,10 +391,8 @@ class StateEditPoseWPButtons (Operator):
 		if bpy.context.scene.pose_on_off:
 			bpy.ops.object.pose_mode_on()
 		if bpy.context.scene.edit_on_off:			
-			bpy.ops.object.object_edit_mode_on(mode = 'EDIT')
-			
-			if 'Armature' in bpy.data.objects:
-				bpy.context.view_layer.objects.active = bpy.data.objects['Armature']
+			bpy.ops.object.object_edit_mode_on(mode = 'EDIT')			
+			bpy.context.view_layer.objects.active = bpy.data.objects[bpy.context.scene.active_mesh].modifiers['Armature'].object
 
 		return {'FINISHED'}
 
@@ -437,22 +446,6 @@ class ShiftVertexWeights(Operator):
 
 		return {'FINISHED'}
 
-#class VertexAssignController(Operator):
-#	bl_idname = "view3d.vert_assign_controller"
-#	bl_label = "Vert Assign Controller"
-#	bl_options = {'REGISTER', 'UNDO'}
-#	mode: bpy.props.StringProperty(options={'HIDDEN'})
-	
-#	def execute(self, context):
-#		if self.mode == 'ADD':
-#			bpy.context.scene.vert_assign_mode_enum = 'ADD'
-#		elif self.mode == 'SUBTRACT':
-#			bpy.context.scene.vert_assign_mode_enum = 'SUBTRACT'
-#		else:
-#			bpy.context.scene.vert_assign_mode_enum = 'REPLACE'	
-
-#		return {'FINISHED'}
-
 class FillActiveVG(Operator):
 	bl_idname = "object.fill_active_vg"
 	bl_label = "Assign Weight"
@@ -462,7 +455,8 @@ class FillActiveVG(Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return _class_method_mesh_(cls, context)	 
+		return bpy.context.object is not None
+	
 	
 	def execute(self, context):
 		if self.mode == 'ADD':
@@ -470,32 +464,29 @@ class FillActiveVG(Operator):
 		elif self.mode == 'SUBTRACT':
 			bpy.context.scene.vert_assign_mode_enum = 'SUBTRACT'
 		else:
-			bpy.context.scene.vert_assign_mode_enum = 'REPLACE'	
+			bpy.context.scene.vert_assign_mode_enum = 'REPLACE'
 
-		if bpy.context.scene.active_mesh in bpy.data.objects:
-			obj = bpy.data.objects[bpy.context.scene.active_mesh]
+		mode = bpy.context.mode
+		value = bpy.context.scene.vertex_weight_input
 
-			mode = bpy.context.mode
-			value = bpy.context.scene.vertex_weight_input
+		if bpy.context.mode != 'OBJECT':
+			bpy.ops.object.mode_set(mode = 'OBJECT')
 
-			if bpy.context.mode != 'OBJECT':
-				bpy.ops.object.mode_set(mode = 'OBJECT')
-
-			obj = bpy.data.objects[bpy.context.scene.active_mesh]
+		obj = bpy.context.object
 			
-			if obj:
-				vg = obj.vertex_groups.active
-				if vg:
-					if vg.lock_weight == False:
-						ind = []						
-						cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups] and vert.select == True]						
-						for i in cont:
-							ind.append(i.index)
-						if ind:
-							for v in ind:
-								vg.add([v], value, self.mode)
-					else:
-						self.report({'WARNING'}, ('Nothing changed.' + '"' + vg.name + '"' + ' is locked.'))
+		if obj:
+			vg = obj.vertex_groups.active
+			if vg:
+				if vg.lock_weight == False:
+					ind = []						
+					cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups] and vert.select == True]						
+					for i in cont:
+						ind.append(i.index)
+					if ind:
+						for v in ind:
+							vg.add([v], value, self.mode)
+				else:
+					self.report({'WARNING'}, ('Nothing changed.' + '"' + vg.name + '"' + ' is locked.'))
 
 			# original mode
 			go_back_to_initial_mode(self, mode)
@@ -504,54 +495,7 @@ class FillActiveVG(Operator):
 			self.report({'WARNING'}, 'Skinned Mesh is not found!')		
 
 		return {'FINISHED'}
-
-#class FillAllVG(Operator):
-#	bl_idname = "object.fill_all_vg"
-#	bl_label = "Fill All"
-#	bl_description = "Fill All Vertex Groups"
-#	bl_options = {'REGISTER', 'UNDO'}
-
-#	@classmethod
-#	def poll(cls, context):
-#		return _class_method_mesh_(cls, context)
 	
-#	def execute(self, context):
-#		if bpy.context.scene.active_mesh in bpy.data.objects:
-#			obj = bpy.data.objects[bpy.context.scene.active_mesh]
-#			mode = bpy.context.mode
-#			value = bpy.context.scene.vertex_weight_input			
-
-#			if bpy.context.mode != 'OBJECT':
-#				bpy.ops.object.mode_set(mode = 'OBJECT')							
-			
-#			if obj:
-#				vgs = obj.vertex_groups	
-				
-#				if vgs:		
-#					for vg in vgs:
-#						if vg:
-#							if vg.lock_weight == False:
-#								ind = []
-#								cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups]]
-								
-#								for i in cont:
-#									ind.append(i.index)
-
-#								if ind:
-#									for v in ind:
-#										vg.add([v], value, 'REPLACE')
-
-#			# original mode
-#			go_back_to_initial_mode(self, mode)
-		
-#		else:
-#			self.report({'WARNING'}, 'Skinned Mesh is not found!')	
-
-#		return {'FINISHED'}
-
-#	def invoke(self, context, event):
-#			return context.window_manager.invoke_confirm(self, event)
-
 class ClampNearZeroValues(Operator):
 	bl_idname = "object.clamp_near_zero_values"
 	bl_label = "Clamp Near Zero Values in All Vertex Groups"
@@ -805,7 +749,7 @@ class ObjectEditModeOn(Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return _class_method_mesh_(cls, context)
+		return context.object is not None
 
 	def execute(self, context):
 		obj = bpy.context.object
@@ -837,8 +781,8 @@ class PoseModeOn(Operator):
 	
 	def execute(self, context):		
 		if bpy.context.mode != 'POSE':
-			if "Armature" in bpy.data.objects:							
-				bpy.context.view_layer.objects.active = bpy.data.objects['Armature']
+			if "Armature" in bpy.data.objects[bpy.context.scene.active_mesh].modifiers:						
+				bpy.context.view_layer.objects.active = bpy.data.objects[bpy.context.scene.active_mesh].modifiers['Armature'].object
 				bpy.ops.object.mode_set(mode='POSE')
 			if bpy.context.scene.lock_all_unused_vgs:
 				bpy.ops.object.lock_unused_vgs()
@@ -886,13 +830,8 @@ class LockUnusedVGs (Operator):
 		return context.object is not None
 	
 	def execute(self, context):
-		o = bpy.context.object
-		skinned_mesh = bpy.context.scene.active_mesh
-		data = bpy.data.objects		
-
-		if o.name == skinned_mesh:
-			obj = data[skinned_mesh]
-			lock_unused(self, obj)
+		obj = bpy.context.object	
+		lock_unused(self, obj)
 		#else:
 		#	self.report({'WARNING'}, (self.bl_label + ": " + 'This object must be a Skinned Mesh for this action'))
 		
@@ -961,68 +900,43 @@ def go_back_to_initial_mode(cls, mode):
 		bpy.ops.object.mode_set(mode = mode)
 
 def lock_and_select(cls, obj):
-		# lock unused vertex groups and select active
-		if "Armature" in bpy.data.objects:			
+	# lock unused vertex groups and select active
+	if "Armature" in obj.modifiers:
+		armature = obj.modifiers['Armature'].object
+		active_bone = None
+		if armature.data.bones.active is not None:
+			active_bone = armature.data.bones.active
 
-			armature = bpy.data.objects['Armature']					
+		if active_bone:
+			# lock unused
+			if bpy.context.scene.lock_all_unused_vgs:
+				if active_bone:
+					for vg in obj.vertex_groups[:]:
+						if vg.name != 'Root' and vg.name != active_bone.name:					
+							vg.lock_weight = True
+						else:
+							vg.lock_weight = False
 
-			active_bone = None
-			if armature.data.bones.active is not None:
-				active_bone = bpy.data.objects['Armature'].data.bones.active
-
-			if active_bone:
-				# lock unused
-				if bpy.context.scene.lock_all_unused_vgs:
-					if active_bone:
-						for vg in obj.vertex_groups[:]:
-							if vg.name != 'Root' and vg.name != active_bone.name:					
-								vg.lock_weight = True
-							else:
-								vg.lock_weight = False
-
-				# select bone's vertex group						
-				if bpy.context.scene.select_all_vg_vertices:
-					vgs = obj.vertex_groups[:]
-					vgs_namelist = []
-					for i in vgs:
-						vgs_namelist.append(i.name)
+			# select bone's vertex group						
+			if bpy.context.scene.select_all_vg_vertices:
+				vgs = obj.vertex_groups[:]
+				vgs_namelist = []
+				for i in vgs:
+					vgs_namelist.append(i.name)
 					
-					if active_bone.name in vgs_namelist:
-						bpy.ops.paint.vert_select_all(action='DESELECT')
-						bpy.ops.object.vertex_group_set_active(group = active_bone.name)
-						bpy.ops.object.vertex_group_select()
-					else:
-						bpy.ops.paint.vert_select_all(action='DESELECT')
-						cls.report({'WARNING'}, 'Vertex Group connected to the active Bone is not found!')
-			else:
-				cls.report({'WARNING'}, 'No Active Bone! Lock failed!')
-
-def add_armature_modifier(cls):
-	if 'Armature' not in bpy.data.objects:
-		add_armature(cls)
-	if 'Armature' in bpy.data.objects:
-		armature = bpy.data.objects['Armature']		
-		if bpy.context.scene.active_mesh in bpy.data.objects:
-			obj = bpy.data.objects[bpy.context.scene.active_mesh]
-			if obj:				
-				if 'Armature' not in obj.modifiers:					
-					obj.select_set(True)					
-					bpy.context.view_layer.objects.active = obj
-					bpy.ops.object.modifier_add(type='ARMATURE')		
-					if 'Armature' in obj.modifiers:						
-						obj.modifiers["Armature"].object = armature
-				else:	
-					if 'Armature' in obj.modifiers:						
-						if obj.modifiers["Armature"].object is None:
-							obj.modifiers["Armature"].object = armature
-							cls.report({'INFO'}, ("Armature Object added."))					
-		else:	
-			cls.report({'WARNING'}, 'Skinned Mesh not found!')
-	else:	
-		cls.report({'WARNING'}, 'Armature is not found!')
+				if active_bone.name in vgs_namelist:
+					bpy.ops.paint.vert_select_all(action='DESELECT')
+					bpy.ops.object.vertex_group_set_active(group = active_bone.name)
+					bpy.ops.object.vertex_group_select()
+				else:
+					bpy.ops.paint.vert_select_all(action='DESELECT')
+					cls.report({'WARNING'}, 'Vertex Group connected to the active Bone is not found!')
+		else:
+			cls.report({'WARNING'}, 'No Active Bone! Lock failed!')
 
 def add_armature(cls):
-	if "Armature" not in bpy.data.objects:				
+	obj = bpy.context.object
+	if obj.type == 'MESH':
 		length = bpy.context.scene.bone_length
 		
 		if  length is not None:
@@ -1032,30 +946,58 @@ def add_armature(cls):
 		
 		if bpy.context.mode != 'OBJECT':
 			bpy.ops.object.object_edit_mode_on(mode="OBJECT")
-		
+
+		# add armature
 		bpy.ops.object.armature_add(radius = length)
-		armature = bpy.data.objects['Armature'].data
+
+		armature = bpy.context.scene.objects[-1].data
 		armature.show_names = True		
 		armature.bones[0].name = 'Root'
 
+		#add modifier		
+		if 'Armature' not in obj.modifiers:
+			bpy.ops.object.mode_set(mode = 'OBJECT')
+			bpy.context.view_layer.objects.active = obj
+			bpy.ops.object.modifier_add(type='ARMATURE')
+			obj.modifiers['Armature'].object =  bpy.context.scene.objects[-1]
+		else:		
+			#cls.report({'WARNING'}, ("This mesh already has Armature Modifier"))		
+			if obj.modifiers['Armature'].object is None:				
+				obj.modifiers['Armature'].object =  bpy.context.scene.objects[-1]
+				cls.report({'INFO'}, ("Armature Object added"))
+
+		#bpy.context.view_layer.objects.active = obj
+		#obj.select_set(True)
+
+		# sync
+		bpy.context.view_layer.objects.active = obj
+		bpy.ops.object.sync_vg()
+
 		# set 1.0 to Root
-		if bpy.context.scene.active_mesh in bpy.data.objects:
-			mesh = bpy.context.scene.active_mesh
-			bpy.ops.object.sync_vg()
+		weight = bpy.context.scene.tool_settings.vertex_group_weight
+		bpy.context.scene.tool_settings.vertex_group_weight = 1
+		bpy.ops.object.mode_set(mode = 'EDIT')
+		for vg in obj.vertex_groups[:]:
+			if vg.name == 'Root':
+				obj.vertex_groups.active = vg
+		bpy.ops.mesh.select_all(action='SELECT')
+		bpy.ops.object.vertex_group_assign()
+		bpy.context.scene.tool_settings.vertex_group_weight = weight
+		bpy.ops.object.mode_set(mode = 'OBJECT')
 
 
-			bpy.context.scene.tool_settings.vertex_group_weight = 1
-			if bpy.context.mode == 'OBJECT':
-				bpy.ops.object.mode_set(mode = 'EDIT')
-				bpy.ops.mesh.select_all(action='SELECT')
-			bpy.ops.object.vertex_group_assign()
-
-	else:
-		cls.report({'WARNING'}, ("Armature already exists"))
 
 def get_bones(cls):	
-	bones = bpy.data.objects["Armature"].data.bones[:]	
-	return bones
+	if bpy.context.object is not None and 'Armature' in bpy.context.object.modifiers and bpy.context.object.modifiers["Armature"].object is not None or bpy.data.objects[bpy.context.scene.active_mesh].modifiers["Armature"].object is not None:
+		bones = None
+		if bpy.context.object.type != "MESH":
+			bones = bpy.data.objects[bpy.context.scene.active_mesh].modifiers["Armature"].object.data.bones[:]
+		else:
+			bones = bpy.context.object.modifiers["Armature"].object.data.bones[:]
+		if bones is not None:
+			return bones
+		else:
+		   return None
 
 def set_properties_to_data(cls):
 	screen = bpy.context.screen
@@ -1084,29 +1026,26 @@ def lock_unused(cls, obj):
 							vg.lock_weight = True
 					else:
 						vg.lock_weight = False
-			else:
-				cls.report({'INFO'}, "Nothing changed!")
 
 def _class_method_mesh_(cls, context):
-	if bpy.context.scene.active_mesh !='':
+	if bpy.context.scene.active_mesh !='' and bpy.context.object is not None:
 		if bpy.context.scene.active_mesh in bpy.data.objects:
 			mesh = bpy.data.objects[bpy.context.scene.active_mesh]
 			if mesh.hide_get() == False and mesh.hide_select == False and mesh.hide_viewport == False:
 				return True
 
 def _class_method_armature_(cls, context):
-	if 'Armature' in bpy.data.objects:
-		armature = bpy.data.objects['Armature']
+	if bpy.context.object is not None and "Armature" in bpy.context.object.modifiers and bpy.context.object.modifiers["Armature"].object is not None:
+		armature = bpy.context.object.modifiers["Armature"].object
 		if armature.hide_get() == False and armature.hide_select == False and armature.hide_viewport == False:
 			return True
 
 def _class_method_mesh_and_armature_(cls, context):
-	if 'Armature' in bpy.data.objects and bpy.context.scene.active_mesh !='':		
-		if bpy.context.scene.active_mesh in bpy.data.objects:
-			mesh = bpy.data.objects[bpy.context.scene.active_mesh]
-			armature = bpy.data.objects['Armature']
-			if armature.hide_get() == False and armature.hide_select == False and armature.hide_viewport == False and mesh.hide_get() == False and mesh.hide_select == False and mesh.hide_viewport == False:
-				return True
+	if bpy.context.object is not None and bpy.context.scene.active_mesh !='' and bpy.context.scene.active_mesh in bpy.data.objects and 'Armature' in bpy.data.objects[bpy.context.scene.active_mesh].modifiers is not None and bpy.data.objects[bpy.context.scene.active_mesh].modifiers['Armature'].object is not None:
+		mesh = bpy.data.objects[bpy.context.scene.active_mesh]
+		armature = mesh.modifiers['Armature'].object
+		if armature.hide_get() == False and armature.hide_select == False and armature.hide_viewport == False and mesh.hide_get() == False and mesh.hide_select == False and mesh.hide_viewport == False:
+			return True
 
 def register():
 	for cls in classes:

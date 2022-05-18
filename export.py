@@ -264,10 +264,11 @@ class BodyExport(Operator):
 								
 								armature = None
 								# add armature to the collection
-								if "Armature" in bpy.data.objects and "Armature" not in collection.all_objects:
-									armature = bpy.data.objects['Armature']
-									armature.select_set(True)
-									collection.objects.link(armature)
+								if "Armature" in body_copy.modifiers:
+									armature = body_copy.modifiers['Armature'].object
+									if armature.name not in collection.all_objects:
+										armature.select_set(True)
+										collection.objects.link(armature)
 								# check the export flag
 								if bpy.context.scene.export_flag:
 									if name:

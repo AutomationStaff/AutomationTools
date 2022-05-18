@@ -77,8 +77,7 @@ class ActiveMeshPanel(Panel):
 		split = column.split(factor=0.75, align=True)
 		split.prop(bpy.context.scene, 'active_mesh')
 
-		split.operator("object.pick_active_mesh", icon='EYEDROPPER')
-		column.operator("object.add_armature_mod", text = "Add [Armature] [Modifier]")
+		split.operator("object.pick_active_mesh", icon='EYEDROPPER')		
 		column.operator(SelectActiveMesh.bl_idname, text = "Select").mode='EDIT'
 		column.separator()
 		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = 'active_mesh'
@@ -344,8 +343,9 @@ class BonesPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
-		
-		column.operator("wm.call_menu", text = "Add", icon='ADD').name = GenerateRigMenu.bl_idname
+
+		column.operator("object.add_armature_mod", text = "Add Armature")
+		column.operator("wm.call_menu", text = "Add Bone", icon='ADD').name = GenerateRigMenu.bl_idname
 		split = column.split(factor=0.75, align=True)
 		split.prop(bpy.context.scene, 'bone_length', slider = True)
 		split.operator("object.scale_all_bones", text = "Apply")		
@@ -444,7 +444,7 @@ class VertexGroupsPanel(Panel):
 		if  len(obj.vertex_groups) > 0:
 			row = layout.row()
 			if obj.vertex_groups.active.lock_weight:
-				row.operator(LockUnusedVGs.bl_idname, text = 'Unlock', icon='LOCKED')
+				row.operator(LockUnusedVGs.bl_idname, text = 'Unlock', icon='LOCKED', depress = True)
 			else:
 				row.operator(LockUnusedVGs.bl_idname, text = 'Unocked', icon='UNLOCKED')
 
@@ -1280,15 +1280,17 @@ class WheelWellSubMenu(Menu):
 class SelectBonesMenu(Menu):
 	bl_idname = "OBJECT_MT_select_bones_menu"
 	bl_label = "Select Bones"
-	bl_description = "Select bones menu"
-	
-	def draw(self, context):
-		layout = self.layout
+	bl_description = "Select bones menu"	
 
-		bones = get_bones(self)
-		if len(bones) > 1:
-			for i in bones:
-				layout.operator("armature.select_bones_and_mode", text = i.name).name= i.name
+	def draw(self, context):
+		if context.object is not None:
+			if get_bones(self) is not None:
+				layout = self.layout
+				bones = get_bones(self)
+		
+				if len(bones) > 1:
+					for i in bones:
+						layout.operator("armature.select_bones_and_mode", text = i.name).name= i.name
 
 class PIE_MT_RigSk_tools(Menu):  
 	bl_label = "Brushes"
