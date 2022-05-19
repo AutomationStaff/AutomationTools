@@ -421,17 +421,20 @@ class VertexGroupsPanel(Panel):
 		obj = bpy.context.object
 		layout = self.layout
 
-		split = layout.split(factor = 0.91)
+		col = layout.column()
+		split = layout.split(factor = 0.92)
 		column_left = split.column()
+
 		column_left.template_list(
-			listtype_name = "UI_UL_list",
+			listtype_name = "MESH_UL_vgroups",
 			list_id = 'OBJECT_PT_VG_PANEL',
 			dataptr = context.object,
 			propname = 'vertex_groups',
 			active_dataptr = context.object.vertex_groups,
 			active_propname = 'active_index',
-			item_dyntip_propname = "Vertex Groups"
-		)
+			item_dyntip_propname = "Vertex Groups"	
+		)	
+
 		column_right = split.column(align=True)
 		column_right.operator("object.vertex_group_add", text = "", icon = 'ADD')
 		column_right.operator("object.vertex_group_remove", text = "", icon = 'REMOVE')
