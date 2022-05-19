@@ -727,7 +727,7 @@ class WeightPaintModeOn(Operator):
 					bpy.ops.object.mode_set(mode='WEIGHT_PAINT')				
 					
 					# lock and select
-					lock_and_select(self, obj)
+					#lock_and_select(self, obj)
 
 					# if carpaint material is on
 					if bpy.context.space_data.type == 'VIEW_3D':
