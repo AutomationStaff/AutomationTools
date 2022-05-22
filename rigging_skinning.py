@@ -48,15 +48,22 @@ class GenerateRig (Operator):
 	name : bpy.props.StringProperty(name="Name")
 	symmetry : bpy.props.BoolProperty(name="Symmetry", default=False)
 	
-	#@classmethod
-	#def poll(cls, context):
-	#	return _class_method_mesh_and_armature_(cls, context)
-
 	@classmethod
 	def poll(cls, context):
-		if bpy.context.object is not None:
-			return True
+		obj = context.object
+		sel = len(context.selected_objects)
+
+		if obj is not None and sel > 0:
+			if sel == 1:
+				if obj.type == 'MESH':
+					return True
+			elif sel == 2 and sel[0] == 'MESH' or sel[1].type == 'MESH':
+				if 'Armature' in sel[0].modifiers or 'Armature' in sel[1].modifiers:
+					return True
+			elif sel == 2 and obj.type == 'ARMATURE':
+				return True
 	
+	# need to add support of active_mesh to select rig and add bones to it directly
 	def execute(self, context):	
 		ops = bpy.ops
 		obj = bpy.context.object
@@ -67,9 +74,9 @@ class GenerateRig (Operator):
 		
 		if  len(sel) > 1:
 			for o in sel:
-				if o.type == 'ARMATURE':
-					o.select_set(False)
-		obj = bpy.context.selected_objects[0]
+				if o.type == 'MESH':
+					bpy.context.view_layer.objects.active = o
+			obj = bpy.context.object 
 
 
 		armature = None
@@ -1126,6 +1133,5 @@ def unregister():
 	bpy.types.Scene.weight_paint_on_off
 	bpy.types.Scene.pose_on_off
 	bpy.types.Scene.edit_on_off	
-
 
 
