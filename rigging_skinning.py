@@ -462,8 +462,7 @@ class FillActiveVG(Operator):
 
 	@classmethod
 	def poll(cls, context):
-		return bpy.context.object is not None
-	
+		return bpy.context.object is not None	
 	
 	def execute(self, context):
 		if self.mode == 'ADD':
@@ -478,26 +477,26 @@ class FillActiveVG(Operator):
 
 		if bpy.context.mode != 'OBJECT':
 			bpy.ops.object.mode_set(mode = 'OBJECT')
-
-		obj = bpy.context.object
 			
-		if obj:
-			vg = obj.vertex_groups.active
-			if vg:
-				if vg.lock_weight == False:
-					ind = []						
-					cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups] and vert.select == True]						
-					for i in cont:
-						ind.append(i.index)
-					if ind:
-						for v in ind:
-							vg.add([v], value, self.mode)
-				else:
-					self.report({'WARNING'}, ('Nothing changed.' + '"' + vg.name + '"' + ' is locked.'))
-
-			# original mode
+		sel = context.selected_objects	
+		
+		if len(sel):
+			for obj in sel:				
+				bpy.context.view_layer.objects.active = obj				
+				vg = obj.vertex_groups.active
+				if vg:
+					if vg.lock_weight == False:
+						ind = []						
+						cont = [vert for vert in obj.data.vertices if vg.index in [i.group for i in vert.groups] and vert.select == True]						
+						for i in cont:
+							ind.append(i.index)
+						if ind:
+							for v in ind:
+								vg.add([v], value, self.mode)					
+					else:
+						self.report({'WARNING'}, ('Nothing changed.' + '"' + vg.name + '"' + ' is locked.'))			 
 			go_back_to_initial_mode(self, mode)
-
+			
 		else:
 			self.report({'WARNING'}, 'Skinned Mesh is not found!')		
 
