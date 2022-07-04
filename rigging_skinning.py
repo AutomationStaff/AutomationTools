@@ -459,7 +459,7 @@ class FillActiveVG(Operator):
 	bl_description = "Assign weight to selected vertices"
 	bl_options = {'REGISTER', 'UNDO'}
 	mode: bpy.props.StringProperty(options={'HIDDEN'})
-
+	multiplier:  bpy.props.IntProperty(options={'HIDDEN'})
 	@classmethod
 	def poll(cls, context):
 		return bpy.context.object is not None	
@@ -473,7 +473,14 @@ class FillActiveVG(Operator):
 			bpy.context.scene.vert_assign_mode_enum = 'REPLACE'
 
 		mode = bpy.context.mode
-		value = bpy.context.scene.vertex_weight_input
+
+		value = None
+		weight = bpy.context.scene.vertex_weight_input
+		min_weight = context.scene.tool_settings.vertex_group_weight
+		if self.multiplier > 0:
+			value = self.multiplier * weight			
+		else:
+			value = weight
 
 		if bpy.context.mode != 'OBJECT':
 			bpy.ops.object.mode_set(mode = 'OBJECT')
@@ -492,7 +499,22 @@ class FillActiveVG(Operator):
 							ind.append(i.index)
 						if ind:
 							for v in ind:
-								vg.add([v], value, self.mode)					
+								if self.mode == 'SUBTRACT':
+									if vg.weight(v) - value < 0.012:
+										vg.add([v], round(0.012, 3), 'REPLACE')
+										# print(round(vg.weight(v), 3))
+										# print(min_weight)
+									else: 
+										vg.add([v], round(value, 3), self.mode)
+								else:
+									vg.add([v], round(value, 3), self.mode)
+
+								#print(round(vg.weight(v), 3))
+															
+								#	vg.add([v], round(min_weight, 3), 'REPLACE')
+								# else:
+								# 	self.report({'WARNING'}, ('Vertex' + '"' + str(v) + '"' + ' is not in the group'))				
+											
 					else:
 						self.report({'WARNING'}, ('Nothing changed.' + '"' + vg.name + '"' + ' is locked.'))			 
 			go_back_to_initial_mode(self, mode)
@@ -501,6 +523,20 @@ class FillActiveVG(Operator):
 			self.report({'WARNING'}, 'Skinned Mesh is not found!')		
 
 		return {'FINISHED'}
+
+class TenfoldWeightBar(Operator):
+	bl_idname = "view3d.tenfold_weight"
+	bl_label = "Increase/Decrease vertex_weight UI value"
+	bl_description = "Increase/Decrease vertex_weight UI value"
+	bl_options = {'REGISTER', 'UNDO'}
+
+	value:  bpy.props.FloatProperty(options={'HIDDEN'})
+	
+
+	def execute(self, context):
+		bpy.data.scenes["Scene"].vertex_weight_input = bpy.data.scenes["Scene"].vertex_weight_input * self.value		
+		return  {'FINISHED'}
+
 	
 class ClampNearZeroValues(Operator):
 	bl_idname = "object.clamp_near_zero_values"
@@ -887,7 +923,8 @@ classes = (
 	SelectBonesAndMode,
 	SelectVGtoBone,
 	LockUnusedVGs,
-	SelectActiveMesh	
+	SelectActiveMesh,
+	TenfoldWeightBar
 )
 
 # Functions
@@ -1067,11 +1104,11 @@ def register():
 		)
 	bpy.types.Scene.vertex_weight_input = bpy.props.FloatProperty(
 		name="Value",
-		default = 0.0,
-		soft_min = 0.0,
-		soft_max = 1.0,
-		min = 0.0,
-		max = 1.0
+		default = 0.004,		
+		min = 0.004,
+		max = 1.0,
+		step = 0.4,
+		precision = 3
 		)	
 	bpy.types.Scene.active_mesh = bpy.props.StringProperty(
 		default = "",
@@ -1132,5 +1169,6 @@ def unregister():
 	bpy.types.Scene.weight_paint_on_off
 	bpy.types.Scene.pose_on_off
 	bpy.types.Scene.edit_on_off	
+	
 
 

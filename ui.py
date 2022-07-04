@@ -436,7 +436,7 @@ class VertexGroupsPanel(Panel):
 		)	
 
 		column_right = split.column(align=True)
-		column_right.operator("object.vertex_group_add", text = "", icon = 'ADD')
+		#column_right.operator("object.vertex_group_add", text = "", icon = '')
 		column_right.operator("object.vertex_group_remove", text = "", icon = 'REMOVE')
 		column_right.separator(factor=1.0)
 		column_right.operator("wm.call_menu", text = "", icon = 'DOWNARROW_HLT').name = "MESH_MT_vertex_group_context_menu"
@@ -462,7 +462,7 @@ class VertexGroupsPanel(Panel):
 			column = layout.column()
 			split = column.split(factor = 0.91, align = True)
 			
-			split.prop(context.scene.tool_settings, 'vertex_group_weight', text = "Weight", slider = True)			
+			split.prop(context.scene.tool_settings, 'vertex_group_weight', text = "Weight")			
 			if context.scene.tool_settings.vertex_group_weight > 0:
 				split.operator("object.toggle_0_1_vertex_weight", text = "", icon = 'RADIOBUT_ON').value = 0.0
 			else:
@@ -576,24 +576,37 @@ class WeightsPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		
-		layout.prop(bpy.context.scene, 'vertex_weight_input', slider = True)
+		column = layout.column(align=True)		
+		weight_bar = column.split(factor=0.7, align=True)
+		weight_bar.prop(bpy.context.scene, 'vertex_weight_input')
+
+		weight_bar.operator("view3d.tenfold_weight", text = "x2").value = 2
+		weight_bar.operator("view3d.tenfold_weight", text = "x10").value = 10
+		weight_bar.operator("view3d.tenfold_weight", text = "/10").value = 0.1	
+		weight_bar.operator("view3d.tenfold_weight", text = "/2").value = 0.5
+
 		
 		column = layout.column(align=True)
 		split1 = column.split(factor=0.33, align=True)
-		split1.operator("object.fill_active_vg", text = "Add").mode = 'ADD'
-		split1.operator("object.fill_active_vg", text = "Subtract").mode = 'SUBTRACT'
-		split1.operator("object.fill_active_vg", text = "Replace").mode = 'REPLACE'
 
-		#column = layout.column(align=True)
-		#split1 = column.split(factor=0.5, align=True)
-		#split1.operator("object.shift_weights", text = "Increase").action = True
-		#split1.operator("object.shift_weights", text = "Decrease").action = False
+		add = split1.operator("object.fill_active_vg", text = "Add")
+		add.mode = 'ADD'
+		add.multiplier = 0
+
+		mlt = split1.operator("object.fill_active_vg", text = "x2")
+		mlt.mode = 'ADD'	
+		mlt.multiplier = 2
+
+		neg_mlt = split1.operator("object.fill_active_vg", text = "/2")
+		neg_mlt.mode = 'SUBTRACT'	
+		neg_mlt.multiplier = 2
+
+		split1.operator("object.fill_active_vg", text = "Subtract").mode = 'SUBTRACT'
 		
-		#split2 = column.split(factor=0.33, align=True)
-		#split2.operator("object.fill_active_vg", text = "Sel").only_selected = True
-		#split2.operator("object.fill_active_vg", text = "Act").only_selected = False
-		#split2.operator("object.fill_all_vg", text = "All")
+		
+		column = layout.column()
 		column.operator("object.clamp_near_zero_values", text = "Clamp")
+		column.operator("object.fill_active_vg", text = "Replace").mode = 'REPLACE'
 
 class NormalsPanel(Panel):
 	bl_label = "Normals"
@@ -1365,12 +1378,12 @@ classes = (
 	TransformPanel,
 	BonesPanel,
 	VertexGroupsPanel,
-	VertexPaintPanel,
+	WeightsPanel,
+	VertexPaintPanel,	
 	ShapeKeysPanel,
 	BrushPanel,
 	BrushAddSubPanel,
-	BrushCustomizedSettingsPanel,
-	WeightsPanel,
+	BrushCustomizedSettingsPanel,	
 	NormalsPanel,
 	CurvesPanel,
 	ModifiersPanel,
