@@ -826,10 +826,25 @@ class OptionsPanel(Panel):
 		layout = self.layout
 		column = layout.column(align=True)
 
-		column.label(text = 'Vertex Groups:')		
+		column.label(text = 'Vertex Groups:')
 		column.prop(bpy.context.scene, 'select_all_vg_vertices')
 		column.prop(bpy.context.scene, 'lock_all_unused_vgs')
 		column.prop(bpy.context.scene, 'auto_add_vertex_group')
+
+class BoneConstraintsExportPanel(Panel):
+	bl_label = "BoneConstraints"
+	bl_idname = "OBJECT_PT_AUTOMATION_TOOLS_BONE_LIMITS_EXPORT_PANEL"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = ExportPanel.bl_idname
+	
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column(align=True)
+		column.operator("object.export_bone_constraints", text = "Export Bone Constraints")
+		
 
 # Menus
 class GenerateRigMenu(Menu):
@@ -1401,6 +1416,7 @@ classes = (
 	HierarchyExportPanel,
 	FixturesExportPanel,
 	StandardBatchExportPanel,
+	BoneConstraintsExportPanel,
 	OptionsPanel,
 	GenerateRigMenu,
 	FenderSubMenu,

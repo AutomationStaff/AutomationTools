@@ -106,7 +106,8 @@ class GenerateRig (Operator):
 		if  length is not None:
 			new_bone.length = length*100
 		else:
-			new_bone.length = 0.1
+			new_bone.length = 0.1		
+
 
 		ops.armature.select_linked()
 		ops.armature.select_all(action='DESELECT')
@@ -120,7 +121,16 @@ class GenerateRig (Operator):
 
 		# select new bone 
 		ops.armature.select_all(action='DESELECT')
-		new_bone.select = True
+		new_bone.select = True		
+		
+		# add bone constraints
+		object.data.edit_bones.active = new_bone
+		bpy.ops.object.pose_mode_on()
+		bpy.ops.pose.constraint_add(type='LIMIT_LOCATION')
+		bpy.context.object.pose.bones[new_bone.name].constraints["Limit Location"].use_transform_limit = True
+
+		ops.object.mode_set(mode = 'EDIT')
+		
 		ops.armature.select_linked()
 
 		# symmetry
@@ -924,7 +934,7 @@ classes = (
 	SelectVGtoBone,
 	LockUnusedVGs,
 	SelectActiveMesh,
-	TenfoldWeightBar
+	TenfoldWeightBar	
 )
 
 # Functions
@@ -1105,7 +1115,7 @@ def register():
 	bpy.types.Scene.vertex_weight_input = bpy.props.FloatProperty(
 		name="Value",
 		default = 0.004,		
-		min = 0.004,
+		min = 0.00,
 		max = 1.0,
 		step = 0.4,
 		precision = 3

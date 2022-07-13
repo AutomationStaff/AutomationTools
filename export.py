@@ -710,6 +710,39 @@ class FixturesBatchExport(Operator):
 		batch_export(self, context, 'Fixture')
 		return {'FINISHED'}
 
+class BoneConstraintsExport(Operator):
+	bl_idname = "object.export_bone_constraints"
+	bl_label = "Bone Constraints Export"
+	bl_description = "Writes active armature Bone Constraints data in a file. The file's content can be copypasted in 'Bone Constraint' section of the Body Variant Preview file using right click context menu -> Paste"
+	bl_options = {'REGISTER', 'UNDO'}
+
+	@classmethod
+	def poll(cls, context):
+		return context.object.type == 'ARMATURE'
+
+	def execute(self, context):	
+		armature = context.object
+		sel = context.selected_objects
+		if len(sel):
+			for arm in sel:
+				if arm.type == 'ARMATURE':		
+					bones_with_constraints = [bone for bone in context.object.pose.bones if len(bone.constraints)]
+					bones_count = len(bones_with_constraints)
+					csv = open(bpy.context.scene.export_path + arm.name + "_BoneConstraints" + ".csv", "w")		
+					
+					csv.write("(")
+					counter = 0
+					for bone in bones_with_constraints:		
+						constraints = bone.constraints["Limit Location"]	
+						csv.write("(Name=" + "\"" + str(bone.name) + "\"" + ",Min=(X=" + str(constraints.min_x) + ",Y=" + str(constraints.min_y) + ",Z=" + str(constraints.min_z) + "),Max=(X=" + str(constraints.max_x) + ",Y=" + str(constraints.max_y) + ",Z=" + str(constraints.max_z) + "))")	
+						counter += 1
+						if (counter < bones_count):
+							csv.write(",")	
+					csv.write(")")
+					csv.close()
+
+		return {'FINISHED'}	
+
 class FixturesExportObjectSelected(Operator):
 	bl_idname = "object.selected_fixtures_batch_export"
 	bl_label = "Non-destructive Selected Fixtures Batch Export"
@@ -1466,7 +1499,8 @@ classes = (
 	FixturesExport,
 	FixturesBatchExport,
 	HierarchyExport,
-	NonDestructiveExport	
+	NonDestructiveExport,
+	BoneConstraintsExport
 	)
 
 # Register
