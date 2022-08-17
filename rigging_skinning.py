@@ -48,22 +48,11 @@ class GenerateRig (Operator):
 	name : bpy.props.StringProperty(name="Name")
 	symmetry : bpy.props.BoolProperty(name="Symmetry", default=False)
 	
+	
 	@classmethod
 	def poll(cls, context):
-		obj = context.object
-		sel = len(context.selected_objects)
-
-		if obj is not None and sel > 0:
-			if sel == 1:
-				if obj.type == 'MESH':
-					return True
-			elif sel == 2 and sel[0] == 'MESH' or sel[1].type == 'MESH':
-				if 'Armature' in sel[0].modifiers or 'Armature' in sel[1].modifiers:
-					return True
-			elif sel == 2 and obj.type == 'ARMATURE':
-				return True
+		return bpy.context.object is not None
 	
-	# need to add support of active_mesh to select rig and add bones to it directly
 	def execute(self, context):	
 		ops = bpy.ops
 		obj = bpy.context.object
@@ -76,38 +65,37 @@ class GenerateRig (Operator):
 			for o in sel:
 				if o.type == 'MESH':
 					bpy.context.view_layer.objects.active = o
-			obj = bpy.context.object 
+					obj = o 
 
 
 		armature = None
 		if 'Armature' not in obj.modifiers or obj.modifiers['Armature'].object is None:
 			add_armature(self)
-			armature = bpy.context.scene.objects[-1]
+			armature = bpy.context.active_object
 		
 		armature = obj.modifiers['Armature'].object
 
 		armature.select_set(True)
 		bpy.context.view_layer.objects.active = armature		
-		
-		object = armature
+	
 		ops.object.mode_set(mode = 'EDIT')
 		
 		# root
-		root = object.data.edit_bones[0]
+		root = armature.data.edit_bones[0]
 		if root.name != 'Root':
 			root.name = 'Root'
 
 		# add a new bone
-		ops.armature.bone_primitive_add(name=self.name)
-		new_bone = object.data.edit_bones[-1]
+		ops.armature.bone_primitive_add()
+		new_bone = armature.data.edit_bones[-1]
+		new_bone.name = self.name
 		
 		length = scene.bone_length
 		
 		if  length is not None:
 			new_bone.length = length*100
 		else:
-			new_bone.length = 0.1		
-
+			new_bone.length = 0.1
 
 		ops.armature.select_linked()
 		ops.armature.select_all(action='DESELECT')
@@ -115,7 +103,7 @@ class GenerateRig (Operator):
 		# parenting
 		new_bone.select = True
 		root.select = True
-		object.data.edit_bones.active = root
+		armature.data.edit_bones.active = root
 		ops.armature.select_linked()		
 		ops.armature.parent_set(type='OFFSET')
 
@@ -124,27 +112,26 @@ class GenerateRig (Operator):
 		new_bone.select = True		
 		
 		# add bone constraints
-		object.data.edit_bones.active = new_bone
+		armature.data.edit_bones.active = new_bone
 		bpy.ops.object.pose_mode_on()
-		bpy.ops.pose.constraint_add(type='LIMIT_LOCATION')
-		bpy.context.object.pose.bones[new_bone.name].constraints["Limit Location"].use_transform_limit = True
+		bpy.ops.pose.constraint_add(type='LIMIT_LOCATION')		
 
 		ops.object.mode_set(mode = 'EDIT')
-		
 		ops.armature.select_linked()
+		armature.pose.bones[armature.data.edit_bones[-1].name].constraints['Limit Location'].use_transform_limit = True		
 
 		# symmetry
 		if self.symmetry is True:
 			bpy.ops.transform.translate(value=(-150, 0, 0), orient_type='GLOBAL')
 			bpy.ops.armature.symmetrize(direction='NEGATIVE_X')
-			object.data.edit_bones[-1].select = True
+			armature.data.edit_bones[-1].select = True
 			new_bone.select = True
 		
 		#if auto sync
 		if bpy.context.scene.auto_add_vertex_group:	
 			ops.object.object_edit_mode_on(mode="OBJECT")
 			ops.object.select_all(action='DESELECT')			
-			obj.select_set(True)			
+			armature.select_set(True)			
 			context.view_layer.objects.active = obj
 			ops.object.sync_vg()		
 
@@ -153,6 +140,7 @@ class GenerateRig (Operator):
 		armature.select_set(True)
 		context.view_layer.objects.active = armature
 		ops.object.object_edit_mode_on(mode="EDIT")
+		
 
 		return {'FINISHED'}
 
@@ -1001,22 +989,21 @@ def add_armature(cls):
 			bpy.ops.object.object_edit_mode_on(mode="OBJECT")
 
 		# add armature
-		bpy.ops.object.armature_add(radius = length)
-
-		armature = bpy.context.scene.objects[-1].data
-		armature.show_names = True		
-		armature.bones[0].name = 'Root'
+		arm = bpy.ops.object.armature_add(radius = length)
+		armature = bpy.context.active_object
+		armature.show_name = True		
+		armature.data.bones[0].name = 'Root'
 
 		#add modifier		
 		if 'Armature' not in obj.modifiers:
 			bpy.ops.object.mode_set(mode = 'OBJECT')
 			bpy.context.view_layer.objects.active = obj
 			bpy.ops.object.modifier_add(type='ARMATURE')
-			obj.modifiers['Armature'].object =  bpy.context.scene.objects[-1]
+			obj.modifiers['Armature'].object =  bpy.context.active_object
 		else:		
 			#cls.report({'WARNING'}, ("This mesh already has Armature Modifier"))		
 			if obj.modifiers['Armature'].object is None:				
-				obj.modifiers['Armature'].object =  bpy.context.scene.objects[-1]
+				obj.modifiers['Armature'].object =  bpy.context.active_object
 				cls.report({'INFO'}, ("Armature Object added"))
 
 		#bpy.context.view_layer.objects.active = obj
