@@ -123,6 +123,22 @@ class LightsUVsPanel(Panel):
 
 		column.operator("OBJECT_OT_at_wiki", text = "Help", icon = "HELP").tool = 'uvs_lights'
 
+class BodyUVs(Panel):
+	bl_label = "Body"
+	bl_idname = "OBJECT_PT_automation_tools_body_uvs_panel"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'	
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+	bl_parent_id = UVsPanel.bl_idname
+	
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column(align=True)
+
+		column.operator("mesh.snap_bottom_uvs", text = "Snap Body Bottom Uvs")	
+		
+
 class UVToolsPanel(Panel):
 	bl_label = "UV Tools"
 	bl_idname = "OBJECT_PT_automation_tools_uv_tools_panel"
@@ -243,6 +259,7 @@ class MaterialsCleanupPanel(Panel):
 		column.label(text = 'Scene')
 		column.operator("object.cleanup_mats_scene_unused", text = "Unused")
 		column.operator("object.cleanup_mats_scene_all", text = "All")
+		
 
 class MaterialsEditPanel(Panel):
 	bl_label = "Edit"
@@ -269,6 +286,10 @@ class MaterialsEditPanel(Panel):
 		split.operator(ReplaceMaterialsAdder.bl_idname, text = "Add").mat = 'add_trg'
 
 		column.operator(ReplaceMaterials.bl_idname, text = "Apply")
+
+		column.label(text = 'Fix Slots')
+		column.prop(bpy.context.scene, "json_mateials_data_path")
+		column.operator("object.fix_material_slots", text = "Fix Slots")
 
 class NamingPanel(Panel):
 	bl_label = "Naming"
@@ -1443,7 +1464,8 @@ classes = (
 	SocketsPanel,
 	UVToolsPanel,
 	ATWiki,
-	MaterialsEditPanel
+	MaterialsEditPanel,
+	BodyUVs
 )
 
 # Functions

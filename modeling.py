@@ -3,9 +3,11 @@ import os
 from bpy.utils import register_class, unregister_class
 from bpy.types import Operator, Panel, Menu
 import bmesh
+import json
 from mathutils import Vector, Matrix
 from random import random, uniform
 from . rigging_skinning import _class_method_mesh_, go_back_to_initial_mode
+
 
 class CopyApplyModifier (Operator):
 	bl_idname = "view3d.copy_apply_modifier"
@@ -698,7 +700,7 @@ class UVSeamsFromHardEdges(Operator):
 		faces = [f for f in bm.faces if f.select]
 		edges = []
 		if sel:
-		   edges = sel
+			edges = sel
 		else:
 			edges = bm.edges
 
@@ -741,10 +743,7 @@ class CreateUVs(Operator):
 				obj.select_set(True)
 				bpy.context.view_layer.objects.active = obj
 				bpy.ops.object.mode_set(mode = 'EDIT')
-				#if len(obj.data.uv_layers) > 0:
-				#	map_name = obj.data.uv_layers.keys()
-				#	uv_map = obj.data.uv_layers[map_name[0]]
-				#bpy.ops.uv.select_all(action='SELECT')
+				
 				bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001, correct_aspect = False)
 				bpy.ops.mesh.scale_uvs(command='SET')
 			
@@ -756,6 +755,61 @@ class CreateUVs(Operator):
 		bpy.ops.object.mode_set(mode = 'EDIT')
 
 		return {'FINISHED'}
+
+class SnapUVBottomsUVs(Operator):
+	bl_idname = "mesh.snap_bottom_uvs"
+	bl_label = "Snap Body Bottom UVs"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Snap Body Bottom UVs"
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and bpy.context.object.mode == "EDIT" and context.mode == "EDIT_MESH" 
+	
+	def get_vertex_uvs(self, v, uv_layer):    
+		for loop in v.link_loops:        
+			uvs = loop[uv_layer]        
+		return uvs
+
+	def get_edge_uvs(self, edge, uv_layer):
+		uvs = []
+		uvs.append(cls.get_vertex_uvs(edge.verts[0]), uv_layer)
+		uvs.append(cls.get_vertex_uvs(edge.verts[1]), uv_layer)    
+		return uvs
+
+	def execute(self, context):
+		obj = bpy.context.active_object.data
+		bm = bmesh.from_edit_mesh(obj)
+		uv_layer = bm.loops.layers.uv.verify()
+				
+		uvs = dict()
+		for face in bm.faces:
+			for loop in face.loops:
+				if loop.vert not in uvs:
+					uvs[loop.vert] = [loop[uv_layer]]
+				else:
+					uvs[loop.vert].append(loop[uv_layer])
+
+		for vert in uvs:
+			for uv_loop in uvs[vert]:
+				if vert.select:                   
+					for e in vert.link_edges:
+						if not e.select:
+							v0 = self.get_vertex_uvs(e.verts[0], uv_layer)
+							v1 = self.get_vertex_uvs(e.verts[1], uv_layer)
+							
+							dist1 = (uv_loop.uv - v0.uv).length
+							dist2 = (uv_loop.uv - v1.uv).length
+
+							if dist1 > dist2:
+								uv_loop.uv = v0.uv
+							else:
+								uv_loop.uv = v1.uv
+
+							bmesh.update_edit_mesh(obj)
+		return {'FINISHED'}
+
+
 
 class ScaleUVs(Operator):
 	bl_label = "Scale Selected UVs"
@@ -804,9 +858,7 @@ class ScaleUVs(Operator):
 	def uv_from_vert_first(self, uv_layer, v, f):
 		for loop in v.link_loops:
 			if loop.face == f:				
-				uv_data = loop[uv_layer]
-				#print ("Filtered face index: ", v.index)
-				#print(uv_data.uv)
+				uv_data = loop[uv_layer]				
 				return uv_data.uv
 	
 	def get_triangle_perimeter(self, verts):
@@ -833,6 +885,7 @@ class ScaleUVs(Operator):
 
 				uv_layer = bm.loops.layers.uv.active
 
+
 				uv_face_list = []
 				for f in bm.faces:
 					for loop in f.loops:		
@@ -841,18 +894,14 @@ class ScaleUVs(Operator):
 							uv_face_list.append(loop.face)
 			
 				if len(uv_face_list):
-					#print(uv_face.index)
-
-					#faces = [f for f in bm.faces]
+					
 					# get the biggest face
 					areas = [f.calc_area() for f in uv_face_list]			
 			
 					max_val = max(areas)
 					ind =  areas.index(max_val)
 
-					f = uv_face_list[ind]
-
-					#print("Face: ", f.index)
+					f = uv_face_list[ind]				
 
 					verts = [v for v in f.verts]
 
@@ -895,8 +944,6 @@ class ScaleUVs(Operator):
 			bpy.ops.uv.pin(clear=True)
 
 		sel = bpy.context.selected_objects
-		#bpy.ops.object.mode_set(mode = 'OBJECT')
-		#bpy.ops.object.select_all(action='DESELECT')
 		
 		for obj in sel:
 			if self.command == "SET":
@@ -1003,35 +1050,7 @@ class UnwrapCylinder(Operator):
 			v.select_set(True)
 		
 		bm.select_flush_mode()
-		bmesh.update_edit_mesh(obj.data)
-
-		#bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-
-		#if bpy.context.scene.tool_settings.use_uv_select_sync == False:
-		#	bpy.context.scene.tool_settings.use_uv_select_sync = True
-		
-		#sel = bpy.context.selected_objects
-		#bpy.ops.object.mode_set(mode = 'OBJECT')
-		#bpy.ops.object.select_all(action='DESELECT')
-		
-		#for obj in sel:
-		#	if obj.type == "MESH":
-		#		obj.select_set(True)
-		#		bpy.context.view_layer.objects.active = obj
-		#		bpy.ops.object.mode_set(mode = 'EDIT')
-		#		#if len(obj.data.uv_layers) > 0:
-		#		#	map_name = obj.data.uv_layers.keys()
-		#		#	uv_map = obj.data.uv_layers[map_name[0]]
-		#		#bpy.ops.uv.select_all(action='SELECT')
-		#		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-		#		#bpy.ops.mesh.scale_uvs()
-			
-		#		bpy.ops.object.mode_set(mode = 'OBJECT')
-		#		bpy.ops.object.select_all(action='DESELECT')
-
-		#for o in sel:
-		#	o.select_set(True)
-		#bpy.ops.object.mode_set(mode = 'EDIT')
+		bmesh.update_edit_mesh(obj.data)		
 
 		return {'FINISHED'}
 
@@ -1068,34 +1087,7 @@ class UnwrapPipe(Operator):
 		bpy.ops.mesh.uv_seams_from_hard_edges()
 
 		bpy.ops.mesh.select_all(action='SELECT')
-		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-
-
-		#if bpy.context.scene.tool_settings.use_uv_select_sync == False:
-		#	bpy.context.scene.tool_settings.use_uv_select_sync = True
-		
-		#sel = bpy.context.selected_objects
-		#bpy.ops.object.mode_set(mode = 'OBJECT')
-		#bpy.ops.object.select_all(action='DESELECT')
-		
-		#for obj in sel:
-		#	if obj.type == "MESH":
-		#		obj.select_set(True)
-		#		bpy.context.view_layer.objects.active = obj
-		#		bpy.ops.object.mode_set(mode = 'EDIT')
-		#		#if len(obj.data.uv_layers) > 0:
-		#		#	map_name = obj.data.uv_layers.keys()
-		#		#	uv_map = obj.data.uv_layers[map_name[0]]
-		#		#bpy.ops.uv.select_all(action='SELECT')
-		#		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-		#		#bpy.ops.mesh.scale_uvs()
-			
-		#		bpy.ops.object.mode_set(mode = 'OBJECT')
-		#		bpy.ops.object.select_all(action='DESELECT')
-
-		#for o in sel:
-		#	o.select_set(True)
-		#bpy.ops.object.mode_set(mode = 'EDIT')
+		bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)	
 
 		return {'FINISHED'}
 
@@ -1311,6 +1303,63 @@ class FixMaterialName(Operator):
 				self.fix_mat_names(context)
 		else:
 			self.fix_mat_names(bpy.context.object)		
+
+		return {'FINISHED'}
+
+
+class FixMateriaSlots(Operator):
+	bl_idname = "object.fix_material_slots"
+	bl_label = "Fix Material Slots"
+	bl_options = {'REGISTER', 'UNDO'}
+	bl_description = "Fix imported material slots"	
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None and len(bpy.context.object.material_slots) > 0
+
+	def do_replace(self, context, obj):
+		PaintedSlots = ['AirFilter', 'IntakeManifold', 'IntakeManifoldTrim', 'Bolt', 'rocker_cover', 'rocker_cover_trim', 'AirFilterTrim', 'blockmaterial']
+
+		elements = None
+		with open(context.scene.json_mateials_data_path, 'r') as json_data:
+			elements = json.load(json_data)
+		json_data.close()		
+		
+		strings	= [material["materialInterface"] for material in elements]
+		src = [e[e.find(".") + 1 : -1] for e in strings]
+
+		slots = [slot["materialSlotName"] for slot in elements]
+		slot_dict = dict(zip(slots, src))
+		print ("*** UE slot name : material name: ", slot_dict)		
+		
+		print("*** UE materials stack:", src)
+		
+		if (len(elements) == len(obj.data.materials) and len(obj.data.materials) > 0):
+			index = 0
+			if obj and obj.type == 'MESH' and len(obj.material_slots) > 0:
+				mat_list = obj.data.materials[:]
+				for i in mat_list:
+					#replace 
+					if (i.name not in PaintedSlots):
+						if i.name != src[index] and src[index] in  bpy.data.materials:					
+							obj.data.materials[index] = bpy.data.materials[src[index]]
+						else:
+							obj.data.materials[index].name = src[index]
+					
+					index += 1
+		else:
+			self.report({'WARNING'},  "Mesh materials count doesn't match! Make sure UE json material data file is relevant")
+				
+		
+
+	def execute(self, context):
+		sel = bpy.context.selected_objects
+		if sel:
+			for obj in sel:
+				bpy.context.view_layer.objects.active = obj
+				self.do_replace(context, obj)
+		else:
+			self.do_replace(context, bpy.context.object)		
 
 		return {'FINISHED'}
 
@@ -2092,7 +2141,6 @@ class VertexPaintrFill(Operator):
 		self.replace_vertex_color(context)
 		return {'FINISHED'}
 
-	############
 class VertexColorChannelOnOff(Operator):
 	bl_idname = "mesh.channel_on_off"
 	bl_label = "Channel On/Off"
@@ -2179,11 +2227,6 @@ class VertexColorChannelOnOff(Operator):
 		go_back_to_initial_mode(self, mode)
 		return {'FINISHED'}
 
-
-		
-
-
-	############
 
 class CopyObjectName(Operator):
 
@@ -2343,8 +2386,7 @@ class CreateCollection(Operator):
 			parent_collection.children.link(new_collection)		
 			for obj in sel:
 				new_collection.objects.link(obj)
-				parent_collection.objects.unlink(obj)
-			
+				parent_collection.objects.unlink(obj)			
 		
 		return {'FINISHED'}
 
@@ -2565,7 +2607,9 @@ classes = (
 	CreateCollection,
 	ReplaceMaterialsGetter,
 	ReplaceMaterialsAdder,
-	VertexColorChannelOnOff
+	VertexColorChannelOnOff,
+	FixMateriaSlots,
+	SnapUVBottomsUVs
 )
 
 # Register
@@ -2589,7 +2633,7 @@ def register():
 	)
 
 	bpy.types.Scene.vertex_color_alpha_value = bpy.props.FloatProperty(name = '', soft_min = 0, soft_max = 1, description = 'Vertex color alpha value')
-	bpy.types.Scene.modifiersVisibilityStateAll = bpy.props.BoolProperty()
+	bpy.types.Scene.modifiersVisibilityStateAll = bpy.props.BoolProperty()	
 	
 	keymaps_list = (
 	'DATA_TRANSFER',
@@ -2649,7 +2693,8 @@ def register():
 	'PARTICLE_SYSTEM',
 	'SOFT_BODY',
 	'SURFACE'
-)
+	)
+	
 	km = bpy.context.window_manager.keyconfigs.addon.keymaps.new(name="3D View", space_type='VIEW_3D')
 	
 	assigned = {
@@ -2663,6 +2708,7 @@ def register():
 	'TRIANGULATE':'EIGHT',
 	'LATTICE':'NINE'
    }	
+	
 	for item in keymaps_list:
 		if item in assigned:
 			key = km.keymap_items.new("view3d.toggle_modifies_by_type", assigned[item], 'PRESS')
@@ -2685,6 +2731,13 @@ def register():
 	description="",
 	items=[('Bezier', 'Bezier', ''), ('Line', 'Line', '')]
 	)
+	
+	bpy.types.Scene.json_mateials_data_path = bpy.props.StringProperty(
+		name="",
+		subtype='FILE_PATH',
+		description = 'UE materials data File Path'
+	)
+	
 
 # Unregister
 def unregister():
@@ -2709,6 +2762,8 @@ def unregister():
 
 	bpy.types.Scene.curve_name
 	bpy.types.Scene.curve_type
+	bpy.types.Scene.json_mateials_data_path
+	
 
 
 
