@@ -465,13 +465,12 @@ class RimExport(Operator):
 							# UV Unwrap				
 							if len(rim_copy.data.uv_layers.keys()) < 1:
 								bpy.ops.mesh.uv_texture_add()
-
-							bpy.ops.object.mode_set(mode = 'EDIT')
-							bpy.ops.mesh.select_all(action='SELECT')
-							bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0)
-							bpy.ops.mesh.scale_uvs(command = "SET")
-							bpy.ops.mesh.select_all(action='DESELECT')
-							bpy.ops.object.mode_set(mode = 'OBJECT')
+								bpy.ops.object.mode_set(mode = 'EDIT')
+								bpy.ops.mesh.select_all(action='SELECT')
+								bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0)
+								bpy.ops.mesh.scale_uvs(command = "SET")
+								bpy.ops.mesh.select_all(action='DESELECT')
+								bpy.ops.object.mode_set(mode = 'OBJECT')
 				
 				# join copies if complex rim				
 				complex_rim = self.complex_rim(rim_copies)
@@ -880,7 +879,7 @@ class HierarchyExport(Operator):
 	bl_idname = "object.fast_auto_fbx_export"
 	bl_label = "Fast Auto Fbx Export"
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = 'Export Fixtures/Engine Parts or other assets with hierarchy. Top Parent is always an Empty.'
+	bl_description = 'Export Fixtures/Engine Parts or other assets with hierarchy. Top Parent should be an Empty.'
 	
 	@classmethod
 	def poll(cls, context):
