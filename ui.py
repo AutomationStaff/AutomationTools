@@ -34,9 +34,6 @@ class ExportPanel(Panel):
 		column = layout.column()
 		column.label(text = 'File Path:')
 		column.prop(bpy.context.scene, "export_path")
-		#if 'offset_x' in bpy.context.object:
-		#	column.label(text = 'Offset:')
-		#	column.prop(bpy.data.objects[bpy.context.object.name], '["offset_x"]', text = 'X')
 
 class GeneratorsPanel(Panel):
 	bl_label = "Generators"
@@ -656,8 +653,15 @@ class TransformPanel(Panel):
 	
 	def draw(self, context):
 		layout = self.layout
-		column = layout.column(align=True)		
-		column.operator("object.move_to_scene_center", text = "Move to Origin")
+		column = layout.column(align=True)
+		column.label(text = "Move")			
+		column.operator("object.move_to_scene_center", text = "Move to Scene Origin")
+		column.separator()
+		column.label(text = "Rotate")
+		column.operator("object.rotate_random", text = "Rand X").axis = 0
+		column.operator("object.rotate_random", text = "Rand Y").axis = 1
+		column.operator("object.rotate_random", text = "Rand Z").axis = 2
+
 
 class ModesPanel(Panel):
 	bl_label = "Modes"
@@ -816,6 +820,7 @@ class HierarchyExportPanel(Panel):
 		split.operator("object.get_selected_objects_names", text = "Add")
 		column.operator("object.fast_auto_fbx_export", text = "Export")
 		column.prop(bpy.context.scene, "if_lods")
+		column.prop(bpy.context.scene, "move_to_scene_origin")
 
 class FixturesExportPanel(Panel):
 	bl_label = "Fixtures"

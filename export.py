@@ -4,6 +4,7 @@ from bpy.utils import register_class, unregister_class
 from bpy.types import Operator
 from pathlib import Path
 import os
+import copy
 from stat import *
 
 class StandardBatchExport(Operator):
@@ -879,7 +880,7 @@ class HierarchyExport(Operator):
 	bl_idname = "object.fast_auto_fbx_export"
 	bl_label = "Fast Auto Fbx Export"
 	bl_options = {'REGISTER', 'UNDO'}
-	bl_description = 'Export Fixtures/Engine Parts or other assets with hierarchy. Top Parent should be an Empty.'
+	bl_description = 'Export Fixtures/Engine Parts or other assets with hierarchy. Each Parent in the hierarchy must be an Empty'
 	
 	@classmethod
 	def poll(cls, context):
@@ -935,7 +936,7 @@ class HierarchyExport(Operator):
 class NonDestructiveExport(Operator):   
 	bl_idname = "object.non_destructive_export"
 	bl_label = "Non-destructive Export"
-	bl_description = "Exports selected objects with hierarchy and without. Converts curves to meshes and corrects flipped normals. Protects exported source objects from modifing."
+	bl_description = "Exports selected objects with hierarchy and without. Converts curves to meshes and corrects flipped normals. Protects exported source objects from modifying"
 
 	@classmethod
 	def poll(cls, context):
@@ -1103,7 +1104,7 @@ class NonDestructiveExport(Operator):
 				bpy.context.view_layer.objects.active = mesh
 				bpy.ops.object.mode_set(mode = 'EDIT')
 				bpy.ops.mesh.select_all(action='SELECT')
-				bpy.ops.object.fill_vertex_color(color_new = color)
+				bpy.ops.mesh.fill_vertex_color(color_new = color)
 				bpy.ops.object.mode_set(mode = 'OBJECT')
 				mesh.select_set(False)
 
@@ -1256,8 +1257,15 @@ class NonDestructiveExport(Operator):
 										i.select_set(True)
 
 								# Export
-								self.exp(p.name)									
-								#self.report({'INFO'}, file)
+								obj_position = None
+								if bpy.context.scene.move_to_scene_origin:
+									obj_position = copy.copy(p.location)
+									bpy.ops.object.move_to_scene_center()
+									self.exp(p.name)
+									p.location = obj_position
+								else:
+									self.exp(p.name)
+								
 																											
 								# if hidden 
 								if hidden:
@@ -1542,6 +1550,13 @@ def register():
 		default = False
 	)
 
+
+	bpy.types.Scene.move_to_scene_origin = bpy.props.BoolProperty(
+		name="Move To Scene Origin",
+		description = "Exported objects will be located in the scene center position",
+		default = False
+	)	
+
 # Unregister
 def unregister():
 	for cls in reversed(classes):
@@ -1551,3 +1566,4 @@ def unregister():
 	bpy.types.Scene.if_apply_modifiers
 	bpy.types.Scene.hierarchy_list
 	bpy.types.Scene.debug_mode
+	bpy.types.Scene.move_to_scene_origin

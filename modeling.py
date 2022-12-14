@@ -2026,7 +2026,7 @@ class EdgeToCurve(Operator):
 
 		return {'FINISHED'}
 
-class VertexPaintrFill(Operator):
+class VertexPaintFill(Operator):
 	bl_idname = "mesh.fill_vertex_color"
 	bl_label = "Fill Vertex Color"
 	bl_description = "Fill Vertex Color"
@@ -2200,8 +2200,7 @@ class VertexColorChannelOnOff(Operator):
 											g = obj.vertex_colors.active.data[loop_index].color[1]
 											b = obj.vertex_colors.active.data[loop_index].color[2]
 
-											obj.vertex_colors.active.data[loop_index].color[to_replace] =  self.action		
-
+											obj.vertex_colors.active.data[loop_index].color[to_replace] =  self.action
 
 					else:
 						self._fill_polygon_(obj, replace_with)
@@ -2229,7 +2228,6 @@ class VertexColorChannelOnOff(Operator):
 
 
 class CopyObjectName(Operator):
-
 	bl_idname = "object.copy_object_name"
 	bl_label = "Copy Object Name"
 	bl_options = {'REGISTER', 'UNDO'} 
@@ -2249,7 +2247,6 @@ class CopyObjectName(Operator):
 		return {'FINISHED'}
 
 class PasteObjectName(Operator):
-
 	bl_idname = "object.paste_object_name"
 	bl_label = "Paste Object Name"
 	bl_options = {'REGISTER', 'UNDO'}
@@ -2404,10 +2401,13 @@ class MoveToSceneCenter(Operator):
 		sel = bpy.context.selected_objects		
 		if len(sel):
 			for i in sel:
-				if i.data.users == 1:
-					i.location = (0,0,0)
+				if i.parent:
+					self.report({'WARNING'},  "Nothing changed. Select the top parent and try again")
+
+				if i.type != 'EMPTY' and i.data.users > 1:
+					self.report({'WARNING'},  "Nothing changed. The mesh has instances")							
 				else:
-					self.report({'WARNING'},  "Nothing changed. The object has instances")
+					i.location = (0.0, 0.0, 0.0)
 		
 		return {'FINISHED'}
 
@@ -2469,15 +2469,44 @@ class SocketInObjectPivotPosition(Operator):
 		return context.active_object is not None
 
 	def execute(self, context):        
-		sel = bpy.context.selected_objects         
+		sel = bpy.context.selected_objects		
 		if len(sel):            
 			for i in sel:               
 				#get pivot position
 				bpy.context.view_layer.objects.active = i
 				pos = i.location               
 				#create empty
-				bpy.ops.object.empty_add(type='PLAIN_AXES', radius=0.5, location = (pos))
-				bpy.context.active_object.name = 'SOCKET_'
+				bpy.ops.object.empty_add(type='PLAIN_AXES', radius=0.005, location = (pos))
+				
+				obj = bpy.context.active_object
+				obj.name = 'SOCKET_' + i.name
+				obj.rotation_euler[0] = i.rotation_euler[0]
+				obj.rotation_euler[1] = i.rotation_euler[1]
+				obj.rotation_euler[2] = i.rotation_euler[2]
+
+
+		else:
+			self.report({'WARNING'}, self.bl_idname + ": " + "Nothing selected!")
+
+		return {'FINISHED'}
+
+class RandomRotation(Operator):
+	bl_idname = "object.rotate_random"
+	bl_label = "Rotate objects with ramdom angle values along selected axis"
+	bl_description = "Rotate objects with ramdom angle values along selected axis"
+	axis: bpy.props.IntProperty(options = {'HIDDEN'})
+
+	@classmethod
+	def poll(cls, context):
+		return context.object is not None
+
+	def execute(self, context):        
+		sel = bpy.context.selected_objects		
+	
+		if len(sel):
+			for obj in sel:
+				obj.rotation_euler[self.axis] = uniform(0, 6.41)
+
 		else:
 			self.report({'WARNING'}, self.bl_idname + ": " + "Nothing selected!")
 
@@ -2586,7 +2615,7 @@ classes = (
 	AddEmptyShapeKeys,
 	ToggleCarPaint,
 	GenerateHierarchy,
-	VertexPaintrFill,
+	VertexPaintFill,
 	CopyObjectName,
 	PasteObjectName,
 	NameForBake,
@@ -2609,7 +2638,8 @@ classes = (
 	ReplaceMaterialsAdder,
 	VertexColorChannelOnOff,
 	FixMateriaSlots,
-	SnapUVBottomsUVs
+	SnapUVBottomsUVs,
+	RandomRotation
 )
 
 # Register
