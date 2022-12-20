@@ -1055,7 +1055,7 @@ class NonDestructiveExport(Operator):
 			bpy.ops.object.convert(target='MESH')
 			bpy.ops.object.make_single_user(object=True, obdata=True)
 
-			# add duplicates to the original selection
+			#add duplicates to the original selection
 			for o in sel:
 				o.select_set(True)
 			for u in convCurves:
@@ -1065,7 +1065,7 @@ class NonDestructiveExport(Operator):
 
 				q.hide_select=True	
 				
-			##unwrap curves
+			#unwrap curves
 			obj.select_all(action='DESELECT')						
 			for mesh in convCurves:
 				mesh.select_set(True)
@@ -1260,12 +1260,11 @@ class NonDestructiveExport(Operator):
 								obj_position = None
 								if bpy.context.scene.move_to_scene_origin:
 									obj_position = copy.copy(p.location)
-									bpy.ops.object.move_to_scene_center()
+									p.location = (0.0, 0.0, 0.0)																									
 									self.exp(p.name)
 									p.location = obj_position
 								else:
-									self.exp(p.name)
-								
+									self.exp(p.name)								
 																											
 								# if hidden 
 								if hidden:
@@ -1528,14 +1527,14 @@ def register():
 
 	bpy.types.Scene.if_apply_modifiers = bpy.props.BoolProperty(
 		name="Apply Modifiers",
-		description = 'Apply Modifiers when the Body is being exported. Mirrored half will be automatically retriangulated.',
+		description = 'Apply Modifiers when the Body is being exported. Mirrored half will be automatically retriangulated',
 		default = True
 	)
 
 	bpy.types.Scene.hierarchy_list = bpy.props.StringProperty(
 		name='',
 		default='',
-		description = 'Select one or more objects with hierarchy.'
+		description = 'Select one or more objects with hierarchy'
 		)
 
 	bpy.types.Scene.if_lods = bpy.props.BoolProperty(
@@ -1546,7 +1545,7 @@ def register():
 
 	bpy.types.Scene.debug_mode = bpy.props.BoolProperty(
 		name="Debug",
-		description = "Allows to check the mesh with applied modifiers and shape keys that is added to the collection.",
+		description = "Allows to check the mesh with applied modifiers and shape keys that is added to the collection",
 		default = False
 	)
 

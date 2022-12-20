@@ -353,7 +353,7 @@ class BonesPanel(Panel):
 	bl_label = "Bones"
 	bl_idname = "OBJECT_PT_AUT_RIG_SK_BONES_PANEL"
 	bl_space_type = 'VIEW_3D'
-	bl_region_type = 'UI'	
+	bl_region_type = 'UI'
 	bl_category = "Automation Tools"
 	bl_options =  {'DEFAULT_CLOSED'}
 	bl_parent_id = RiggingSkinningPanel.bl_idname

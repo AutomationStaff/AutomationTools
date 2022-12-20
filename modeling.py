@@ -989,68 +989,54 @@ class UnwrapCylinder(Operator):
 	bl_label = "Unwrap Cylinder"
 	bl_options = {'REGISTER', 'UNDO'}
 	bl_description = "Unwrap Cylinder"
-	angle_1 : bpy.props.FloatProperty(default = 0.5, min = 0.0, max = 3.14159 )
-	angle_2 : bpy.props.FloatProperty(default = 1.5, min = 0.0, max = 3.14159)
-	angle_3 : bpy.props.FloatProperty(default = 1.57, min = 0.0, max = 3.14159)
 
 	@classmethod
 	def poll(cls, context):
 		return context.object is not None and context.mode == "EDIT_MESH"
 
-	def execute(self, context):
-		
-		angle_1 = self.angle_1
-		angle_2 = self.angle_2
-		angle_3 = self.angle_3
-		
+	def execute(self, context):		
 		obj = bpy.context.object
-		bm = bmesh.from_edit_mesh(obj.data)		
+		bm = bmesh.from_edit_mesh(obj.data)
+
+		if bm.select_mode != 'FACE':
+			bm.select_mode = {'FACE'}
 		
-		verts = [v for v in bm.verts if v.select]
-		#print (verts)
+		top_faces = [f for f in bm.faces if f.select]
 		bpy.ops.mesh.select_all(action='DESELECT')
 
-		#find a 90deg angle between edges
-		angles = {}
-		for v in verts:
-			edges = v.link_edges
-			for e in edges:
-				#e.select_set(True)
-				#print (e.calc_face_angle())
-				angles[e.index] = e.calc_face_angle(None)	
-		#print (angles)
+		ortho_faces = []
+		if len(top_faces):
+			top_normal = top_faces[0].normal
 
-		#get non-90 deg edge for a seam
-		for ind, ang in angles.items():
-			if ang != None:
-				if angle_1 < ang < angle_3:
-					bm.edges.ensure_lookup_table()
-					bm.edges[ind].select_set(True)
-					break
-		#get caps
-		for ind, ang in angles.items():
-			if ang != None:
-				if ang > angle_2:
-					bm.edges.ensure_lookup_table()
-					bm.edges[ind].select_set(True)
+		for f in bm.faces:
+			if f.normal == top_normal:
+				top_faces.append(f)
+			else:
+				ortho_faces.append(f)
+
+		# for f in top_faces:
+		# 	f.select = True
+	#	bpy.ops.mesh.region_to_loop()
+
+		ortho_edge = None
+		for f in ortho_faces:
+			for v in f.verts:
+				if (v.normal.dot(top_normal) == 0):
+					v.select = True
+					#print(v.index)
 					
-		
-		bpy.ops.mesh.mark_seam(clear=False)
+
+				# if v.co.dot(top_normal) == 0:
+				# 	#v.select = True
+				# 	print(v.index)
+
+
 
 		bm.select_flush_mode()
 		bmesh.update_edit_mesh(obj.data)
-
-		bm.select_mode = {"EDGE"}
-
-		bpy.ops.mesh.loop_multi_select(ring=False)
-		bpy.ops.mesh.mark_seam(clear=False)
+		bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='VERT')
+	
 		
-		bm.select_mode = {"VERT"}
-		for v in verts:
-			v.select_set(True)
-		
-		bm.select_flush_mode()
-		bmesh.update_edit_mesh(obj.data)		
 
 		return {'FINISHED'}
 
@@ -2168,8 +2154,7 @@ class VertexColorChannelOnOff(Operator):
 
 				if if_replace and fill_polygon:
 					bpy.context.scene.fill_vertex_paint = False
-					fill_polygon = bpy.context.scene.fill_vertex_paint
-				
+					fill_polygon = bpy.context.scene.fill_vertex_paint				
 
 				to_replace = None
 
@@ -2415,6 +2400,7 @@ class SocketInVertexSelectionCentre(Operator):
 	bl_idname = "mesh.socket_in_vertex_selection_centre"
 	bl_label = "Socket In Vertex Selection Centre"
 	bl_description = "Create a Socket in the vertex selection centre"
+	rad: bpy.props.FloatProperty()
 	
 	@classmethod
 	def poll(cls, context):
@@ -2433,27 +2419,33 @@ class SocketInVertexSelectionCentre(Operator):
 
 		if len(verts) > 0:
 			for vert in verts:
-				v_pos += vert.co            
+				v_pos += vert.co          
 
 			v_pos_avg = v_pos / len(verts)
-			orient = bpy.context.scene.transform_orientation_slots[0].type            
+			orient = bpy.context.scene.transform_orientation_slots[0].type         
 
-			new_socket = bpy.data.objects.new("SOCKET_", None)
-			scene_collection = context.layer_collection.collection
-			scene_collection.objects.link(new_socket)
+			# new_socket = bpy.data.objects.new("SOCKET_", None)
+			# scene_collection = context.layer_collection.collection
+			# scene_collection.objects.link(new_socket)
+			# new_socket.empty_display_size = self.radius
+			bpy.ops.object.mode_set(mode = 'OBJECT')
+			bpy.ops.object.empty_add(radius = 0.01)
+			bpy.context.active_object.name = 'SOCKET_'
+			new_socket = bpy.data.objects[bpy.context.active_object.name]
 			
 			if orient == "LOCAL":
 				new_matrix = obj.matrix_world @ Matrix.Translation(v_pos_avg)
-				new_socket.matrix_world = new_matrix                
+				new_socket.matrix_world = new_matrix
 				
 			elif orient == "GLOBAL":
 				new_matrix = obj.matrix_world @ Matrix.Translation(v_pos_avg)
 				new_socket.matrix_world = new_matrix
 				new_socket.rotation_euler = ( 0, 0, 0 )
 
-			bpy.context.view_layer.objects.active = obj          
-			obj.select_set(True)
-			bpy.ops.mesh.select_all(action='DESELECT')             
+			#bpy.context.view_layer.objects.active = obj      
+			#obj.select_set(True)
+			bpy.ops.object.select_all(action='DESELECT')
+			new_socket.select_set(True)
 		else:
 			self.report({'WARNING'}, self.bl_idname + ": "+ "Nothing selected!")
 			
@@ -2476,7 +2468,7 @@ class SocketInObjectPivotPosition(Operator):
 				bpy.context.view_layer.objects.active = i
 				pos = i.location               
 				#create empty
-				bpy.ops.object.empty_add(type='PLAIN_AXES', radius=0.005, location = (pos))
+				bpy.ops.object.empty_add(type='PLAIN_AXES', radius=0.01, location = (pos))
 				
 				obj = bpy.context.active_object
 				obj.name = 'SOCKET_' + i.name
