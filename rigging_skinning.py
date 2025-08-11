@@ -51,7 +51,7 @@ class GenerateRig (Operator):
 	
 	@classmethod
 	def poll(cls, context):
-		return bpy.context.object is not None
+		return bpy.context.object.type == "MESH"
 	
 	def execute(self, context):	
 		ops = bpy.ops
@@ -104,7 +104,7 @@ class GenerateRig (Operator):
 		new_bone.select = True
 		root.select = True
 		armature.data.edit_bones.active = root
-		ops.armature.select_linked()		
+		ops.armature.select_linked()
 		ops.armature.parent_set(type='OFFSET')
 
 		# select new bone 
@@ -112,13 +112,13 @@ class GenerateRig (Operator):
 		new_bone.select = True		
 		
 		# add bone constraints
-		armature.data.edit_bones.active = new_bone
-		bpy.ops.object.pose_mode_on()
-		bpy.ops.pose.constraint_add(type='LIMIT_LOCATION')		
+		# armature.data.edit_bones.active = new_bone
+		# bpy.ops.object.pose_mode_on()
+		# bpy.ops.pose.constraint_add(type='LIMIT_LOCATION')
 
-		ops.object.mode_set(mode = 'EDIT')
-		ops.armature.select_linked()
-		armature.pose.bones[armature.data.edit_bones[-1].name].constraints['Limit Location'].use_transform_limit = True		
+		# ops.object.mode_set(mode = 'EDIT')
+		# ops.armature.select_linked()
+		# armature.pose.bones[armature.data.edit_bones[-1].name].constraints['Limit Location'].use_transform_limit = True		
 
 		# symmetry
 		if self.symmetry is True:
@@ -139,8 +139,7 @@ class GenerateRig (Operator):
 		context.view_layer.objects.active = armature
 		armature.select_set(True)
 		context.view_layer.objects.active = armature
-		ops.object.object_edit_mode_on(mode="EDIT")
-		
+		ops.object.object_edit_mode_on(mode="EDIT")		
 
 		return {'FINISHED'}
 
@@ -534,7 +533,6 @@ class TenfoldWeightBar(Operator):
 	def execute(self, context):
 		bpy.data.scenes["Scene"].vertex_weight_input = bpy.data.scenes["Scene"].vertex_weight_input * self.value		
 		return  {'FINISHED'}
-
 	
 class ClampNearZeroValues(Operator):
 	bl_idname = "object.clamp_near_zero_values"
@@ -899,12 +897,10 @@ class SelectActiveMesh (Operator):
 		return {'FINISHED'}
 
 classes = (
-	#VertexAssignController,
 	GenerateRig,	
 	AddArmatureMod,
 	ScaleAllBones,
 	SyncVG,
-	#FillAllVG,
 	FillActiveVG,
 	DrawBrushBlendToggle,
 	DrawBrushTemplateSettings1,
