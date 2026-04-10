@@ -42,31 +42,47 @@ class DrawBrushBlendToggle(Operator):
 
 class GenerateRig (Operator):	
 	bl_idname = "object.generate_rig"
-	bl_label = "Generate Rig"
+	bl_label = "Add Bones"
 	bl_description = "Add Car Body Bones"
 	bl_options = {'REGISTER', 'UNDO'}	
 	name : bpy.props.StringProperty(name="Name")
-	symmetry : bpy.props.BoolProperty(name="Symmetry", default=False)
-	
+	offset: bpy.props.FloatVectorProperty(name='Offset', size=2, subtype='XYZ', options={'SKIP_SAVE'})
 	
 	@classmethod
 	def poll(cls, context):
-		return bpy.context.object is not None
+		return context.object is not None or context.scene.active_mesh != ''
+
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column()
+		column.prop(self, 'name')
+		column.separator()
+		row = column.row()
+		row.prop(self, 'offset')
 	
-	def execute(self, context):	
+	def execute(self, context):
 		ops = bpy.ops
-		obj = bpy.context.object
+		active_mesh = context.scene.active_mesh
+		
+		obj = None
+		if active_mesh != '' and active_mesh in bpy.data.objects:
+			obj = bpy.data.objects[active_mesh]
+		else:
+			obj = context.object
+
+		if obj is None:
+			self.report({'ERROR'}, 'The scene should have a Context Object or an AT Active Mesh')
+			return{'CANCELLED'}				
+
+		if obj.type != "MESH":
+			self.report({'ERROR'}, 'Context object must be a Mesh or an AT Active Mesh selected!')
+			return{'CANCELLED'}			
+		
+		context.view_layer.objects.active = obj
+		obj.select_set(True)
+
 		data = bpy.data.objects
 		scene = bpy.context.scene
-		context = bpy.context
-		sel = bpy.context.selected_objects
-		
-		if  len(sel) > 1:
-			for o in sel:
-				if o.type == 'MESH':
-					bpy.context.view_layer.objects.active = o
-					obj = o 
-
 
 		armature = None
 		if 'Armature' not in obj.modifiers or obj.modifiers['Armature'].object is None:
@@ -83,20 +99,15 @@ class GenerateRig (Operator):
 		# root
 		root = armature.data.edit_bones[0]
 		if root.name != 'Root':
-			root.name = 'Root'
+			root.name = 'Root'		
+		root.length = scene.bone_length
 
 		# add a new bone
 		ops.armature.bone_primitive_add()
 		new_bone = armature.data.edit_bones[-1]
-		new_bone.name = self.name
+		new_bone.name = self.name	
+		new_bone.length = scene.bone_length
 		
-		length = scene.bone_length
-		
-		if  length is not None:
-			new_bone.length = length*100
-		else:
-			new_bone.length = 0.1
-
 		ops.armature.select_linked()
 		ops.armature.select_all(action='DESELECT')
 
@@ -104,28 +115,15 @@ class GenerateRig (Operator):
 		new_bone.select = True
 		root.select = True
 		armature.data.edit_bones.active = root
-		ops.armature.select_linked()		
+		ops.armature.select_linked()
 		ops.armature.parent_set(type='OFFSET')
 
 		# select new bone 
 		ops.armature.select_all(action='DESELECT')
-		new_bone.select = True		
+		new_bone.select = True
 		
-		# add bone constraints
-		armature.data.edit_bones.active = new_bone
-		bpy.ops.object.pose_mode_on()
-		bpy.ops.pose.constraint_add(type='LIMIT_LOCATION')		
-
-		ops.object.mode_set(mode = 'EDIT')
-		ops.armature.select_linked()
-		armature.pose.bones[armature.data.edit_bones[-1].name].constraints['Limit Location'].use_transform_limit = True		
-
-		# symmetry
-		if self.symmetry is True:
-			bpy.ops.transform.translate(value=(-150, 0, 0), orient_type='GLOBAL')
-			bpy.ops.armature.symmetrize(direction='NEGATIVE_X')
-			armature.data.edit_bones[-1].select = True
-			new_bone.select = True
+		new_bone.head.xy = self.offset.xy
+		new_bone.tail.xy = self.offset.xy
 		
 		#if auto sync
 		if bpy.context.scene.auto_add_vertex_group:	
@@ -138,9 +136,20 @@ class GenerateRig (Operator):
 		#back to the new bone selection
 		context.view_layer.objects.active = armature
 		armature.select_set(True)
-		context.view_layer.objects.active = armature
 		ops.object.object_edit_mode_on(mode="EDIT")
 		
+		#symmetrize
+		if self.name[:2] in {'L_', 'R_'}:							
+			bpy.ops.armature.symmetrize(direction= 'NEGATIVE_X' if self.offset.x > 0 else 'POSITIVE_X')
+			old_bone = armature.data.edit_bones[-2]
+			old_bone.select = True
+
+			new_bone = armature.data.edit_bones[-1]
+			new_bone.select = True		
+			armature.data.edit_bones.active	= new_bone
+
+		ops.object.object_edit_mode_on(mode="OBJECT")
+		ops.object.object_edit_mode_on(mode="EDIT")
 
 		return {'FINISHED'}
 
@@ -164,19 +173,18 @@ class ScaleAllBones (Operator):
 	bl_idname = "object.scale_all_bones"
 	bl_label = "Apply Bone Scale"
 	bl_description = "Apply Bone Scale"
-	bl_options = {'REGISTER', 'UNDO'}	
+	bl_options = {'REGISTER', 'UNDO'}
 	
 	@classmethod
 	def poll(cls, context):
 		return bpy.context.object is not None and bpy.context.object.type =='ARMATURE'	
 	
 	def execute(self, context):		
-		length = bpy.context.scene.bone_length
-		bpy.ops.object.mode_set(mode = 'EDIT')			
+		length = context.scene.bone_length
+		bpy.ops.object.mode_set(mode = 'EDIT')		
 		bones = context.object.data.edit_bones
 		for bone in bones:
-			bone.length = length * 100
-		bpy.ops.object.mode_set(mode = 'OBJECT')
+			bone.length = length
 
 		return {'FINISHED'}
 
@@ -242,7 +250,7 @@ class SyncVG (Operator):
 
 				go_back_to_initial_mode(self, mode)
 
-				set_properties_to_data(self)
+				# set_properties_to_data(self)
 		else:
 			self.report({'WARNING'}, 'Skinned Mesh is hidden or locked!')
 
@@ -298,7 +306,7 @@ class SelectBonesAndMode(Operator):
 		if edit:						
 			bpy.ops.object.object_edit_mode_on(mode="EDIT")			
 					
-		set_properties_to_data(self)
+		# set_properties_to_data(self)
 									
 
 		return {'FINISHED'}
@@ -363,7 +371,7 @@ class SelectVGtoBone(Operator):
 								bpy.ops.object.object_edit_mode_on(mode = 'EDIT')
 								bpy.context.view_layer.objects.active = arm_obj
 
-							set_properties_to_data(self)
+							# set_properties_to_data(self)
 						else:			
 							self.report({'WARNING'}, (name + ' not found!'))
 			else:
@@ -534,7 +542,6 @@ class TenfoldWeightBar(Operator):
 	def execute(self, context):
 		bpy.data.scenes["Scene"].vertex_weight_input = bpy.data.scenes["Scene"].vertex_weight_input * self.value		
 		return  {'FINISHED'}
-
 	
 class ClampNearZeroValues(Operator):
 	bl_idname = "object.clamp_near_zero_values"
@@ -899,12 +906,10 @@ class SelectActiveMesh (Operator):
 		return {'FINISHED'}
 
 classes = (
-	#VertexAssignController,
 	GenerateRig,	
 	AddArmatureMod,
 	ScaleAllBones,
 	SyncVG,
-	#FillAllVG,
 	FillActiveVG,
 	DrawBrushBlendToggle,
 	DrawBrushTemplateSettings1,
@@ -1039,20 +1044,20 @@ def get_bones(cls):
 		else:
 		   return None
 
-def set_properties_to_data(cls):
-	screen = bpy.context.screen
-	areas = bpy.context.screen.areas[:]
-	area_list = [area.type == 'PROPERTIES' for area in areas]
+# def set_properties_to_data(cls):
+# 	screen = bpy.context.screen
+# 	areas = bpy.context.screen.areas[:]
+# 	area_list = [area.type == 'PROPERTIES' for area in areas]
 
-	k=0
-	for index in area_list:
-		if index:
-			break		
-		else:
-			k += 1
+# 	k=0
+# 	for index in area_list:
+# 		if index:
+# 			break		
+# 		else:
+# 			k += 1
 	
-	if areas[k].regions.data.spaces.active.context != 'DATA':		
-		areas[k].regions.data.spaces.active.context = 'DATA'
+# 	if areas[k].regions.data.spaces.active.context != 'DATA':		
+# 		areas[k].regions.data.spaces.active.context = 'DATA'
 
 def lock_unused(cls, obj):
 	# lock unused								
