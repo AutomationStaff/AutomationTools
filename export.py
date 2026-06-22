@@ -618,7 +618,7 @@ class FixturesExport(Operator):
 	def fixture_export(self, collection_name, file_path, if_apply_transform):
 		bpy.ops.export_scene.fbx(
 		filepath=(file_path + "/" + collection_name + ".fbx"),
-		use_active_collection=True,
+		use_active_collection=False,
 		check_existing=False,
 		use_selection=True,
 		object_types={'MESH', 'ARMATURE'},
@@ -703,8 +703,8 @@ class FixturesExport(Operator):
 										else:
 											armature = get_armature(self, fixture_copy)
 
-										if armature is not None:
-											armature.object.select_set(True)
+										if armature is not None and armature.object is not None:											
+											armature.object.select_set(True)					
 
 										# if single mesh fixture
 										if complex_fixture is None:
@@ -717,11 +717,12 @@ class FixturesExport(Operator):
 											if complex_fixture is not None:
 												complex_fixture.select_set(True)
 												bpy.context.view_layer.objects.active = complex_fixture
+
 											# export
 											self.fixture_export(collection_name, file_path, context.scene.if_apply_transform)
 											self.report({'INFO'}, full_name)
 
-											bpy.ops.object.select_all(action='DESELECT')
+											bpy.ops.object.select_all(action='DESELECT')									
 
 										else:
 											self.report({'WARNING'}, 'File path is not valid!')
@@ -858,7 +859,7 @@ class FixturesExportObjectSelected(Operator):
 							full_name = validate_export_name(self, fixture_copy.name) + '.fbx'
 
 							armature = get_armature(self, fixture_copy)
-							if armature is not None:
+							if armature is not None and armature.object is not None:
 								armature.object.select_set(True)	
 
 							if file_path:
