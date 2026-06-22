@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------------------------------
 #	Automation Tools: Blender Add-on
 #	Camshaft Software
-#	Copyright (C) 2021
+#	Copyright (C) 2026
 #----------------------------------------------------------------------------------------------
 #	MIT License
 #----------------------------------------------------------------------------------------------
@@ -27,29 +27,30 @@ bl_info = {
 	"name": "Automation Tools",
 	"description": "Automation Modeling, Rigging and Skinning Tools",
 	"author": "Camshaft Software",
-	"version": (1, 0, 7),
-	"blender": (2, 92, 0),
+	"version": (1, 4, 0),
+	"blender": (3, 0, 0),
 	"location": "Sidebar -> Automation Tools",
 	"url": "https://github.com/AutomationStaff/AutomationTools",
     "wiki_url": "https://github.com/AutomationStaff/AutomationTools/wiki",
 	"category": "3D View"
 }
- 
 
 if "bpy" in locals():
 	import importlib
 	importlib.reload(ui)
 	importlib.reload(modeling)
 	importlib.reload(generators)
-	importlib.reload(rigging_skinning)
+	importlib.reload(rigging_skinning)	
 	importlib.reload(export)
+	# importlib.reload(utils)
 else:
 	from . import(
 		ui,
-		modeling,
+		modeling,		
 		generators,
 		rigging_skinning,
-		export
+		export,
+		# utils
 	)
 
 import bpy
@@ -60,7 +61,8 @@ modules = (
 	modeling,
 	generators,
 	rigging_skinning,
-	export
+	export,
+	# utils
 	)
 
 def register():
