@@ -905,24 +905,66 @@ class SelectActiveMesh (Operator):
 		
 		return {'FINISHED'}
 
-class TransferShapeKeyVertPositions(Operator):
-	bl_idname  = 'mesh.at_transfer_shape_keys_vert_positions'
-	bl_label = 'Transfer ShapeKey Vert Positions'
-	bl_description = 'Transfer selected shape key vert coordinates from source to target'
-	src: bpy.props.StringProperty(name='Source ShapeKey Name', default='Basis')
+
+def build_shape_keys_list(self, context):
+	obj = context.object
+
+	if obj.data.shape_keys is None:
+		return []
+
+	key_blocks = obj.data.shape_keys.key_blocks
 	
+	names = [key_block.name for key_block in key_blocks]
+	shape_keys_list = []
+	target = obj.data.shape_keys.key_blocks[obj.active_shape_key_index]
+	for name in names:
+		if name == target.name:
+			continue
+
+		shape_keys_list.append(
+				(
+					name,
+					name,
+					''
+				)
+			)
+
+	return shape_keys_list
+
+class AT_SetShapeKeysVerts(Operator):
+	bl_idname  = 'mesh.at_set_shape_keys_verts'
+	bl_label = 'Set Shape Keys Verts'
+	bl_description = 'Set selected shape keys vert coordinates. Target is the active shape key'
+	src: bpy.props.EnumProperty(items=build_shape_keys_list, name='Source Shape Key:', default=0, description='Source shape key the vert coordinates taken from')
+	bl_options = {'REGISTER', 'UNDO'}
+
+	@classmethod
+	def poll(cls, context):
+		obj = context.object
+		return obj is not None and obj.data.shape_keys is not None
+		
 	def execute(self, context):
 		obj = bpy.context.object
 		bpy.ops.object.mode_set(mode = 'OBJECT')
 
-		if obj.data.shape_keys:
-			source = obj.data.shape_keys.key_blocks.get(self.src)
-			target = obj.data.shape_keys.key_blocks[bpy.context.object.active_shape_key_index]
+		if not len(obj.data.shape_keys.key_blocks) > 1:
+			self.report({'ERROR'},  'The mesh must have more than one shape keys!')
+			return {'CANCELLED'}
+
+		source = obj.data.shape_keys.key_blocks.get(self.src)
+		target = obj.data.shape_keys.key_blocks[obj.active_shape_key_index]
 			
-			if source:
-				for i, vert in enumerate(source.data):
-					if obj.data.vertices[i].select:
-						target.data[i].co = source.data[i].co
+		sel = [vert.index for vert in obj.data.vertices if vert.select]
+		
+		if not len(sel) > 0:
+			self.report({'WARNING'},  'No selected vertices!')
+			return {'CANCELLED'}
+					
+		if source is not None:
+			for index in sel:				
+				target.data[index].co = source.data[index].co
+
+		bpy.ops.object.mode_set(mode = 'EDIT')
 
 		return {'FINISHED'}
 
@@ -949,7 +991,7 @@ classes = (
 	LockUnusedVGs,
 	SelectActiveMesh,
 	TenfoldWeightBar,
-	TransferShapeKeyVertPositions
+	AT_SetShapeKeysVerts
 )
 
 # Functions					

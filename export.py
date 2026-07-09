@@ -64,7 +64,8 @@ class StandardBatchExport(Operator):
 						if obj.data.shape_keys and len(obj.modifiers):					
 							obj_copy = bpy.data.objects.new(obj.name, obj.data.copy())
 							context.scene.collection.objects.link(obj_copy)
-							obj_copy.select_set(True)												
+							obj_copy.select_set(True)
+							context.view_layer.objects.active = obj					
 							bpy.ops.object.modifiers_copy_to_selected()
 							obj_copy.modifiers.active = obj_copy.modifiers[0]
 							
@@ -1555,7 +1556,7 @@ def collection_hierarchy_export_menu(self, context):
 	layout.operator(CollectionHierarchyExport.bl_idname, text = 'Export')
 
 
-class ModularExport(Operator):
+class AT_ModularExport(Operator):
 	bl_idname = 'object.at_export_modular_mesh'
 	bl_label = 'Modular Export'
 	bl_description = 'Export an engine part modular mesh. The script unpacks the source mesh by splitting its copy into temporary FRONT, MID and REAR segments, then performs their export and removes them from the scene'
@@ -1563,7 +1564,7 @@ class ModularExport(Operator):
 		('SET_LIMITS', 'SetLimits', '', 0),
 		('DEBUG', 'Debug', '', 1),
 		('EXPORT', 'Export', '', 2)],
-		name='Mode', options={'HIDDEN', 'SKIP_SAVE'})
+		name='Mode', options={'HIDDEN', 'SKIP_SAVE'})	
 
 	bl_options = {'REGISTER', 'UNDO'}
 
@@ -1609,19 +1610,22 @@ class ModularExport(Operator):
 			meshes.append(copy)
 
 			# parent the copy to the source collection
-			bpy.data.collections['LOD'+str(lod_index)].objects.link(copy)	
+			bpy.data.collections['LOD'+str(lod_index)].objects.link(copy)
 			for user_collection in copy.users_collection:
 				if user_collection.name not in copy.name:
-					user_collection.objects.unlink(copy)	
+					user_collection.objects.unlink(copy)
 			
-			bm = bmesh.new()		
+			bm = bmesh.new()
 			bm.from_mesh(mesh)
 			bm.verts.ensure_lookup_table()
 
 			# find verts inside and outside clipping planes
-			verts = []			
-			
-			if limits != (0.0, 0.0):
+			verts = []
+
+			limits_type = bpy.context.scene.at_modular_limits_type
+			color = source.data.color_attributes.active_color
+
+			if limits_type == 'X-Coords':
 				match(segment):
 					case 'FRONT':
 						verts = [vert for vert in bm.verts if round(vert.co.x, 3) <= limits[0]]
@@ -1629,9 +1633,11 @@ class ModularExport(Operator):
 						verts = [vert for vert in bm.verts if limits[0] <= round(vert.co.x, 3) <= limits[1]]
 					case 'REAR':
 						verts = [vert for vert in bm.verts if round(vert.co.x, 3) >= limits[1]]
-			else:
-				color_limits = bm.loops.layers.color.get('Limits')
-				if color_limits is not None:					
+
+			elif limits_type == 'Color':				
+				color_limits = bm.loops.layers.color.get(color.name)
+
+				if color_limits is not None:
 					match(segment):
 						case 'FRONT':
 							verts = [vert for vert in bm.verts for loop in vert.link_loops if loop[color_limits].x == 1]
@@ -1640,13 +1646,14 @@ class ModularExport(Operator):
 						case 'REAR':
 							verts = [vert for vert in bm.verts for loop in vert.link_loops if loop[color_limits].z == 1]
 					verts = list(set(verts))
-
+				else:
+					self.report({'WARNING'}, source.name + ': ' + 'BMesh can\'t find the Active Color Attribute. If it exists, try converting it to CORNER & BYTE_COLOR')
+					return None	
+			
 			if not len(verts) > 0:
-				self.report({'ERROR'}, 'Limits for unpacking segment ' + copy.name + ' are not found or set. If they are numeric, they cannot be (0,0) or if they are vertex color-coded, they must be in "Limits" color attribute of the source mesh')
-				bpy.data.meshes.remove(mesh, do_unlink=True)
 				bm.free()
-				return
-
+				return None
+			
 			# do slicing
 			for vert in bm.verts[:]:
 				if vert not in verts:
@@ -1655,8 +1662,8 @@ class ModularExport(Operator):
 			bm.to_mesh(mesh)
 			bm.free()
 
-			if 'Limits' in copy.data.attributes:
-				mesh.attributes.remove(mesh.attributes['Limits'])				
+			if color is not None and color.name in copy.data.attributes:
+				mesh.attributes.remove(mesh.attributes[color.name])		
 
 			# if the source has 'Wighted Normal' modifier, we want to copy it on a new segment
 			source_wn_mod = None
@@ -1674,10 +1681,17 @@ class ModularExport(Operator):
 					new_wn_mod.use_face_influence = source_wn_mod.use_face_influence
 					new_wn_mod.vertex_group = source_wn_mod.vertex_group
 					new_wn_mod.weight = source_wn_mod.weight
+
+			return mesh
 			
 		meshes = []
-		for segment in {'FRONT', 'MID', 'REAR'}:			
-			unpack(source, segment)
+		for segment in {'FRONT', 'MID', 'REAR'}:
+			unpacked_mesh = unpack(source, segment)			
+			if unpacked_mesh is None:
+				for mesh in meshes:
+					if mesh.data.name in bpy.data.meshes:
+						bpy.data.meshes.remove(mesh.data, do_unlink=True)			
+				return None
 
 		return meshes
 
@@ -1698,16 +1712,20 @@ class ModularExport(Operator):
 
 		bm.free()
 
-		bpy.context.scene.at_export_modular_mesh_limits = ((min(verts), max(verts)))
+		bpy.context.scene.at_modular_numeric_limits = ((min(verts), max(verts)))
 
 	def export(self, context, *, debug=False):
 		objects = bpy.data.objects		
-		base_name = context.scene.at_export_modular_mesh_name
+		base_name = context.scene.at_modular_mesh_name
 		depsgraph = context.evaluated_depsgraph_get()
+		limits_type = context.scene.at_modular_limits_type
+		if base_name == '':
+			self.report({'ERROR'}, 'Base name is an empty string!')
+			return{'CANCELLED'}	
 
 		lod0_name = base_name + '_LOD0'
 		if not lod0_name in bpy.data.objects:
-			self.report({'ERROR'}, 'The scene must have the object ' + lod0_name + ' for unpacking')
+			self.report({'ERROR'}, 'The scene must contain the source mesh ' + lod0_name + ' for unpacking!')
 			return{'CANCELLED'}
 		
 		# lod0 will be the default active object for start
@@ -1719,7 +1737,7 @@ class ModularExport(Operator):
 			bpy.ops.object.mode_set(mode = 'OBJECT')
 			bpy.ops.object.select_all(action='DESELECT')
 		else:
-			self.report({'ERROR'}, 'bpy.ops.object.mode_set.poll() failed! Make sure that there is an active object in the scene')			
+			self.report({'ERROR'}, 'Can\'t select ' +  lod0_name +  ' because it is hidden, unselectable or not in the scene!')
 			return{'CANCELLED'}
 
 		# set active colelction to default
@@ -1729,7 +1747,7 @@ class ModularExport(Operator):
 			self.report({'ERROR'}, 'Base name is an empty string!')
 			return{'CANCELLED'}
 
-		limits = context.scene.at_export_modular_mesh_limits
+		limits = context.scene.at_modular_numeric_limits
 
 		if not base_name in bpy.data.collections:
 			self.report({'ERROR'}, 'Collection ' + base_name + ' not found!')
@@ -1737,6 +1755,30 @@ class ModularExport(Operator):
 
 		lods_collections = bpy.data.collections[base_name].children
 		lods_count = len(lods_collections)
+
+		# geometry and hierarchy tests
+		for index, lod_collection in enumerate(lods_collections):
+			source_lod_name = base_name +'_LOD'+str(index)
+			if not source_lod_name in lod_collection.objects:
+				self.report({'ERROR'}, lod_collection.name + ' must contain a source mesh for unpacking!')
+				return{'CANCELLED'}
+
+			source_lod = bpy.data.objects[source_lod_name]
+			if source_lod.type != 'MESH':
+				self.report({'ERROR'}, source_lod.name + ' must be a mesh! The type is ' + source_lod.type)
+				return{'CANCELLED'}
+			
+			if (limits[0], limits[1]) == (0,0) and limits_type == 'X-Coords':
+				if not 'Limits' in source_lod.data.attributes:
+					self.report({'ERROR'}, 'X-Coordinate limits are not set! They cannot be zeroes!')
+					return{'CANCELLED'}
+
+			if 	limits_type == 'Color':
+				color = source_lod.data.color_attributes.active_color
+				if color is None:	
+					self.report({'ERROR'}, source_lod.name + ' does not have an Active Color Attribute!')
+					return{'CANCELLED'}			
+		#
 
 		if not context.scene.if_lods:
 			context.scene.if_lods=True
@@ -1747,7 +1789,7 @@ class ModularExport(Operator):
 
 		# unpack meshes
 		for lod_index in range(lods_count):
-			segment_name = base_name+'_LOD'+str(lod_index)
+			segment_name = base_name + '_LOD'+str(lod_index)
 			
 			if not segment_name in objects:
 				self.report({'WARNING'}, segment_name + ' not found!')
@@ -1772,13 +1814,16 @@ class ModularExport(Operator):
 			bpy.context.view_layer.objects.active = source
 
 			# clear custom normals data on source because we don't want it on new segments to make shading seams between segments		  
-			bpy.ops.mesh.customdata_custom_splitnormals_clear()		
-
-			# unpack segments using copy of the source because we applied modifiers on it and it is ready to be used for slicing
+			bpy.ops.mesh.customdata_custom_splitnormals_clear()
+			
 			unpacked_segments = self.at_unpack_mesh_into_segments(source, ((round(limits[0],3), round(limits[1],3))), lod_index, depsgraph)
 
 			if unpacked_segments is None:
-				self.report({'ERROR'}, 'Limits for ' + source.name + ' are not found or set correctly. If they are numeric, they cannot be (0, 0) or if they are vertex color-coded, they must be painted in "Limits" color attribute of the source mesh')
+				for empty in temp:
+					if empty.name in bpy.data.objects:
+						bpy.data.objects.remove(empty, do_unlink=True)
+
+				self.report({'ERROR'}, limits_type + ' Limits for' + source.name + ' are not found or set correctly!')
 				return {'CANCELLED'}
 
 			temp.extend(unpacked_segments)
@@ -1787,7 +1832,6 @@ class ModularExport(Operator):
 			source.hide_set(vis[0])
 			source.hide_viewport = vis[1]
 			source.hide_select = vis[2]
-
 
 		# parent meshes
 		for index, collection in enumerate(lods_collections):
@@ -1992,7 +2036,7 @@ classes = (
 	HierarchyExport,
 	NonDestructiveExport,
 	CollectionHierarchyExport,
-	ModularExport
+	AT_ModularExport
 	)
 
 # Register
@@ -2051,8 +2095,13 @@ def register():
 
 	bpy.types.Scene.if_move_to_origin = bpy.props.BoolProperty(options={'HIDDEN'}, name = 'Move to Origin')
 
-	bpy.types.Scene.at_export_modular_mesh_name = bpy.props.StringProperty(name='Name')
-	bpy.types.Scene.at_export_modular_mesh_limits = bpy.props.FloatVectorProperty(name='Limits', size=2, precision=5, description='Left and right cut plane X-coordinates')
+	bpy.types.Scene.at_modular_mesh_name = bpy.props.StringProperty(name='', description='The base name that is used for generating names of exported sections. It can\'t be empty and is the same as the name of the root collection')
+	bpy.types.Scene.at_modular_numeric_limits = bpy.props.FloatVectorProperty(name='', size=2, precision=5, description='Mid section X-axis Left and Right bounds')
+	bpy.types.Scene.at_modular_limits_type = bpy.props.EnumProperty(items=[
+		('X-Coords','COORDS',  '', 0),
+		('Color','COLOUR',  '', 1)
+		],
+		name='Limits type', description='Select the method of setting the limits for source mesh slicing')
 
 # Unregister
 def unregister():
@@ -2067,5 +2116,6 @@ def unregister():
 	del bpy.types.Scene.join_root_elements
 	del bpy.types.Scene.if_apply_transform
 	del bpy.types.Scene.if_move_to_origin
-	del bpy.types.Scene.at_export_modular_mesh_name
-	del bpy.types.Scene.at_export_modular_mesh_limits
+	del bpy.types.Scene.at_modular_mesh_name
+	del bpy.types.Scene.at_modular_numeric_limits
+	del bpy.types.Scene.at_modular_limits_type

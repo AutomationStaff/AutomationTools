@@ -7,7 +7,7 @@ import json
 import math
 from mathutils import Vector, Matrix, Euler, Quaternion, Color
 import mathutils.geometry
-from random import random, uniform
+from random import random, uniform, randint
 from . rigging_skinning import _class_method_mesh_, go_back_to_initial_mode
 from io import StringIO
 import subprocess
@@ -73,45 +73,26 @@ class CopyApplyModifier (Operator):
 
 		return {'FINISHED'}
 
-class ToggleModifiersByType(Operator):
-	bl_idname = "view3d.toggle_modifiers_by_type"
-	bl_label = "Toggle Modifiers By Type"
-	bl_description = 'Toggle Modifiers by Type'	
-	mod_type: bpy.props.EnumProperty(items=[
-		('NONE', 'NONE', '', 0),		
-		('MIRROR', 'MIRROR', '', 1),
-		('SUBSURF', 'SUBSURF', '', 3),	
-		('SOLIDIFY', 'SOLIDIFY', '', 4),			
-		('SHRINKWRAP', 'SHRINKWRAP', '', 5),
-		('BEVEL', 'BEVEL', '', 6),
-		('ARRAY', 'ARRAY', '', 7),
-		('DECIMATE', 'DECIMATE', '', 8),
-		('CURVE', 'CURVE', '', 9)
-		],
-		name='Modifier type', default='NONE')
+class ToggleActiveModifierVisibility(Operator):
+	bl_idname = "object.toggle_active_modifier_visibility"
+	bl_label = "Toggle Active Modifier Visibility"
+	bl_description = "Toggle Active Modifier Visibility"
+	bl_options = {'REGISTER', 'UNDO'}	
 
 	@classmethod
-	def poll(cls, context):
-		return context.object is not None
-
-	def ToggleModifiers (self, mods_stack):
-		if len(mods_stack):
-			for m in mods_stack:
-				if m.type == self.mod_type:
-					if m.show_viewport == True:
-						m.show_viewport = False
-					else:
-						m.show_viewport = True
-
-		else:
-			self.report({'WARNING'}, "[Error]: Mesh has no Modifiers")
+	def poll(self, context):
+		obj = context.object
+		return obj is not None and (obj.type == 'MESH' or obj.type == 'CURVE')
 
 	def execute(self, context):
-		sel = [obj for obj in context.selected_objects if obj.type == 'MESH']
-		if sel:
-			for o in sel:
-				mods_stack = o.modifiers[:]
-				self.ToggleModifiers(mods_stack)
+		obj = context.object
+		modifiers = obj.modifiers
+		active = modifiers.active
+
+		if active.show_viewport == True:
+			active.show_viewport = False
+		else:
+			active.show_viewport = True
 
 		return {'FINISHED'}
 
@@ -2012,8 +1993,8 @@ class ToggleCarPaint(Operator):
 
 class FillVertexColors(Operator):
 	bl_idname = "mesh.fill_vertex_colors"
-	bl_label = "Fill vertices"
-	bl_description = "Fill vertex color"
+	bl_label = "Set"
+	bl_description = "Set Vertex Colors"
 	bl_options = {'REGISTER', 'UNDO'}
 	color: bpy.props.FloatVectorProperty(name='Color', subtype='COLOR', size=4, min=0.0, max=1.0, default=(0, 0, 0, 1))
 
@@ -2022,30 +2003,25 @@ class FillVertexColors(Operator):
 		return context.object
 
 	def execute(self, context):
-		# update_object_edit(context)
+		update_object_edit(context)
 		if context.mode != 'OBJECT':
 			bpy.ops.object.mode_set(mode='OBJECT')
 		
 		for obj in [obj for obj in context.selected_objects if obj.type == 'MESH']:
 			mesh = obj.data			
-			active = mesh.attributes.active_color
-			if active is not None and active.name != 'Color':
-				active.name = 'Color'				
-				update_edit_object(context)
+			active = mesh.attributes.active_color			
+			
+			if active is None:
+				continue
 
 			bm = bmesh.new()
 			bm.from_mesh(mesh)
 		
-			color = bm.loops.layers.color.get('Color')				
+			color = bm.loops.layers.color.get(active.name)				
 
-			if color is None:		
-				if 'Color' not in mesh.attributes:
-					color = bm.loops.layers.color.new('Color')
-					bm.to_mesh(mesh)					
-					mesh.attributes.active_color = mesh.attributes["Color"]
-				else:		
-					self.report({'WARNING'}, obj.name + ': ' + "Color Attribute \'Color\' already exists. Note that it has to be a single color CORNER & BYTE_COLOR attribute and named \'Color\'")
-					continue
+			if color is None:				
+				self.report({'WARNING'}, obj.name + ': ' + 'BMesh can\'t find the Active Color Attribute. If it exists, try converting it to CORNER & BYTE_COLOR')
+				continue
 
 			# fill polygons
 			if mesh.use_paint_mask:
@@ -2065,6 +2041,7 @@ class FillVertexColors(Operator):
 
 			bm.to_mesh(mesh)		
 			bm.free()
+
 		update_edit_object(context)
 		bpy.ops.object.mode_set(mode = 'EDIT')
 
@@ -2446,14 +2423,19 @@ class CreateCollection(Operator):
 		if parent_collection is not None:
 			parent_collection.children.link(new_collection)
 			for obj in sel:
-				new_collection.objects.link(obj)
-				parent_collection.objects.unlink(obj)
+				for user_collection in obj.users_collection:
+					user_collection.objects.unlink(obj)
+					if obj.name not in new_collection.objects:
+						new_collection.objects.link(obj)
+
 		else:
-			parent_collection = bpy.context.view_layer.active_layer_collection.collection
+			parent_collection = context.view_layer.active_layer_collection.collection
 			parent_collection.children.link(new_collection)
 			for obj in sel:
-				new_collection.objects.link(obj)
-				parent_collection.objects.unlink(obj)
+				for user_collection in obj.users_collection:
+					user_collection.objects.unlink(obj)
+					if obj.name not in new_collection.objects:
+						new_collection.objects.link(obj)
 
 		return {'FINISHED'}
 
@@ -4149,33 +4131,168 @@ class AT_Numerate(Operator):
 		numerate(context.selected_objects, self.lods)
 		return {'FINISHED'}
 
-class SwitchScenes(Operator):
-	bl_idname = 'view3d.switch_scenes'
-	bl_label = 'Switch Scenes'
-	bl_description = ''	
-	bl_options = {'REGISTER', 'UNDO'}
-	index: bpy.props.IntVectorProperty(name='Index', size=2, default=(0,1))
-	
-	def execute(self, context):
-		index = self.index
-		if context.scene == bpy.data.scenes[index[0]]:    
-			context.window.scene = bpy.data.scenes[index[1]]
-		elif context.scene == bpy.data.scenes[index[1]]:
-			context.window.scene = bpy.data.scenes[index[0]]
+def build_scenes_list(self, context):
+	names = [scene.name for scene in bpy.data.scenes]
+	scenes_list = []
+	for name in names:
+		scenes_list.append(
+				(
+					name,
+					name,
+					''
+				)
+			)
+	 
+	return scenes_list
 
+class AT_SwitchScenes(Operator):
+	bl_idname = 'scene.at_switch_scenes'
+	bl_label = 'Switch Scenes'
+	bl_description = 'Switch between scenes'
+	scene_1: bpy.props.EnumProperty(items=build_scenes_list, name=' ', default=0)
+	scene_2: bpy.props.EnumProperty(items=build_scenes_list, name=' ', default=1)
+	bl_options = {'REGISTER', 'UNDO'}
+
+	def init_list(self, context):
+		needs_set = True
+		if context.scene.stored_views.mode == 'VIEW':
+			view_list_size = len(context.scene.stored_views.view_list)			
+			if view_list_size == 0:
+				bpy.ops.stored_views.save(index=-1)
+				needs_set = False		
+		
+		elif context.scene.stored_views.mode == 'POV':
+			pov_list_size = len(context.scene.stored_views.pov_list)		
+			if pov_list_size == 0:
+				bpy.ops.stored_views.save(index=-1)
+				needs_set = False				
+
+		return needs_set
+
+	def invoke(self, context, event):
 		if 'bl_ext.blender_org.stored_views' in context.preferences.addons:
 			if bpy.ops.view3d.stored_views_initialize.poll():
 				bpy.ops.view3d.stored_views_initialize()
+		else:
+			self.report({'ERROR'},  'Stored Views addon is not installed!')
+			return {'CANCELLED'}
 
-			if bpy.ops.stored_views.set.poll():
-				bpy.ops.stored_views.set(index=0)
+		if self.scene_1 == self.scene_2:
+			return{'CANCELLED'}
+
+		self.init_list(context)
+
+		return self.execute(context)
+
+	@classmethod
+	def poll(cls, context):
+		return len(bpy.data.scenes) > 1
+	
+	def execute(self, context):
+		scene_1 = self.scene_1
+		scene_2 = self.scene_2
+
+		self.init_list(context)
+
+		# scene switching mechanism
+		if context.scene == bpy.data.scenes[scene_1]:
+			bpy.ops.stored_views.save(index=0)
+			context.window.scene = bpy.data.scenes[scene_2]
+		elif context.scene == bpy.data.scenes[scene_2]:
+			bpy.ops.stored_views.save(index=0)
+			context.window.scene = bpy.data.scenes[scene_1]
+		else:
+			bpy.ops.stored_views.save(index=0)
+			context.window.scene = bpy.data.scenes[scene_1]
+
+		# now we are in the scene we wanted, just need to reset the view		
+		
+		if self.init_list(context):
+			bpy.ops.stored_views.set(index=0)
 
 		return{'FINISHED'}
-			
+
+class AT_SaveFile(Operator):
+	bl_idname = 'wm.at_save_file'
+	bl_label = 'AT Save Routine'
+	bl_description = 'Save current file and write a backup file in the Temporary Files directory'	
+	bl_options = {'REGISTER', 'UNDO'}
+	
+	def execute(self, context):
+		backup = context.scene.at_backup_path
+		file = bpy.data.filepath
+
+		if file == '':
+			bpy.ops.wm.save_as_mainfile(('INVOKE_AREA'))
+		else:
+			bpy.ops.wm.save_mainfile()
+			if backup != '' and os.path.exists(backup):
+				bpy.ops.wm.save_as_mainfile(filepath=backup + bpy.path.basename(file)[:-6] + '_' + str(randint(10000000, 19999999)) + '.blend', copy=True)
+
+		return{'FINISHED'}
+
+class AT_SpawnCollectionInstance(Operator):
+	bl_idname = 'scene.at_spawn_collection_instance'
+	bl_label = 'Spawn Collection Instance'
+	bl_description = 'Spawn the active collection instance in the main scene'
+	bl_options = {'REGISTER', 'UNDO'}
+
+	def execute(self, context):
+		obj = bpy.data.objects.new(context.object.name, None)
+		obj.empty_display_size = 0.001
+		bpy.data.scenes['Scene'].collection.objects.link(obj)
+		obj.instance_type = 'COLLECTION'
+		obj.instance_collection = bpy.context.collection
+
+		return{'FINISHED'}
+
+class AT_EditModeToggleInstanceSafe(Operator):
+	bl_idname = "object.editmode_toggle_instance_safe"
+	bl_label = "Edit Mode Toggle Instance Safe"
+	bl_description = 'Edit Mode toggle that shouldn\'t drop instances related errors'
+	bl_options = {'REGISTER', 'UNDO'}
+
+	def get_instances(self, data):
+		user_map = bpy.data.user_map()
+		users = user_map.get(data, set())   
+		instance_map = {scene: [] for scene in bpy.data.scenes}   
+		
+		for user in users:		
+			if user.id_type == 'OBJECT':
+				for scene in bpy.data.scenes:
+					if user.name in scene.objects:
+						instance_map[scene].append(user)				
+				
+		return instance_map	
+
+	def execute(self, context):
+		obj = context.object
+		if not bpy.ops.object.editmode_toggle.poll():
+			self.report({'WARNING'},  obj.name + ' does not have Edit Mode! ' + 'Type: ' + obj.type)
+			return {'CANCELLED'}
+
+		scene = context.scene
+		mode = obj.mode
+
+		instances_map = self.get_instances(obj.data)
+		for _scene_, _instances_ in instances_map.items():			
+			if _scene_ == scene:				
+				continue
+			context.window.scene = _scene_
+			if len(_instances_) > 0:
+				for _instance_ in _instances_:
+					if _instance_.mode != mode:
+						bpy.ops.object.editmode_toggle()
+						break
+
+		context.window.scene = scene
+		bpy.ops.object.editmode_toggle()
+
+		return {'FINISHED'}
 
 classes = (
 	CopyApplyModifier,
-	ToggleModifiersByType,
+	ToggleActiveModifierVisibility,
 	ToggleAllModifiersVisibility,
 	TransferModifiers,
 	AddBevelWidthDriver,
@@ -4262,7 +4379,10 @@ classes = (
 	AT_SetMeshPositionToZero,
 	AT_SnapCursorToSelectedVerts,
 	AT_CursorToZero,
-	SwitchScenes
+	AT_SwitchScenes,
+	AT_SaveFile,
+	AT_SpawnCollectionInstance,
+	AT_EditModeToggleInstanceSafe
 )
 
 # Register
@@ -4295,6 +4415,12 @@ def register():
 		description = 'UE materials data File Path'
 	)	
 
+	bpy.types.Scene.at_backup_path = bpy.props.StringProperty(
+		name="",
+		default=bpy.app.tempdir,
+		subtype='FILE_PATH',
+		description = 'A Custom way of storing backups instead of standard hardcoded Blender way of saving .blend files in the scene root directory. Everytime the scene is saved its backup copy is created in that directory. Preferences > Files&Load > SaveVersions can be set to 0. If it is not set, the versions go to the Blender Temporary Files directory'
+	)
 
 # Unregister
 def unregister():
@@ -4314,5 +4440,6 @@ def unregister():
 	del bpy.types.Scene.json_materials_data_path
 	del bpy.types.Scene.new_object_name_input
 	del bpy.types.Scene.new_collection_name_input
+	del bpy.types.Scene.at_backup_path
 
 

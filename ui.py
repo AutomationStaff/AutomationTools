@@ -35,6 +35,19 @@ class ExportPanel(Panel):
 		column.prop(bpy.context.scene, "if_apply_transform")
 		column.prop(bpy.context.scene, "if_move_to_origin")
 
+class BackupPanel(Panel):
+	bl_label = "Backup"
+	bl_idname = "OBJECT_PT_AUT_BACKUP_PANEL"
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'
+	bl_category = "Automation Tools"
+	bl_options =  {'DEFAULT_CLOSED'}
+
+	def draw(self, context):
+		layout = self.layout
+		column = layout.column()		
+		column.prop(bpy.context.scene, "at_backup_path")
+
 class GeneratorsPanel(Panel):
 	bl_label = "Generators"
 	bl_idname = "OBJECT_PT_AUTOMATION_TOOLS_GENERATORS_PANEL"
@@ -415,6 +428,7 @@ class SocketsPanel(Panel):
 		column.operator(AddEmptyInComponentSelectionCenter.bl_idname, text = "Selection")
 		column.operator(AddEmptyInLoop.bl_idname, text = "Loops")
 		column.operator(SocketInObjectPivotPosition.bl_idname, text = "Pivot")
+		column.operator(AT_SpawnCollectionInstance.bl_idname, text = "Collection Instance")	
 
 class BonesPanel(Panel):
 	bl_label = "Bones"
@@ -473,7 +487,7 @@ class ShapeKeysPanel(Panel):
 		column_right.operator("wm.call_menu", text = "", icon = 'DOWNARROW_HLT').name = "MESH_MT_shape_key_context_menu"
 		column_right.separator(factor=1.0)
 		column_right.operator("object.shape_key_move", text = "", icon = 'TRIA_UP').type = 'UP'
-		column_right.operator("object.shape_key_move", text = "", icon = 'TRIA_DOWN').type = 'DOWN'
+		column_right.operator("object.shape_key_move", text = "", icon = 'TRIA_DOWN').type = 'DOWN'		
 
 		if obj.active_shape_key and obj.active_shape_key.name != 'Basis':
 			column = layout.column()
@@ -488,6 +502,9 @@ class ShapeKeysPanel(Panel):
 		row = layout.row(align = True)
 		row.operator("object.add_empty_shape_keys", text = "Body", icon = 'ADD').type = 'BODY'
 		row.operator("object.add_empty_shape_keys", text = "Rim", icon = 'ADD').type = 'RIM'
+
+		column = layout.column()
+		column.operator(AT_SetShapeKeysVerts.bl_idname, text = "Set Verts")
 
 class VertexGroupsPanel(Panel):
 	bl_label = "Vertex Groups"
@@ -575,7 +592,7 @@ class VertexPaintPanel(Panel):
 		row = box.row()
 		column = row.column(align=True)
 		row.prop(context.object.data, 'use_paint_mask', text='')
-		row.operator(FillVertexColors.bl_idname, text = "Fill", icon='COLOR')
+		row.operator(FillVertexColors.bl_idname, text = "Custom", icon='COLOR')
 		row.operator(FillVertexColors.bl_idname, text = "", icon='RGB_RED').color = Vector((1,0,0,1))
 		row.operator(FillVertexColors.bl_idname, text = "", icon='RGB_GREEN').color = Vector((0,1,0,1))
 		row.operator(FillVertexColors.bl_idname, text = "", icon='RGB_BLUE').color = Vector((0,0,1,1))
@@ -803,7 +820,6 @@ class ShadingPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column()
-
 		column.operator("view3d.toggle_carpaint", text = "Car Paint / Basic")
 		column.operator('object.at_assign_color', text = "Assign Color")		
 
@@ -883,7 +899,6 @@ class BodyExportPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
-
 		column.operator(BodyExport.bl_idname, text = "One Collection")
 		column.operator(BodiesBatchExport.bl_idname, text = "All Collections")
 		column.prop(bpy.context.scene, "if_apply_modifiers")
@@ -902,7 +917,6 @@ class RimExportPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
-
 		column.operator("object.rim_export", text = "One Collection")
 		column.operator("object.rim_batch_export", text = "All Collections")
 		column.prop(bpy.context.scene, "debug_mode")
@@ -936,18 +950,46 @@ class ModularExportPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		column = layout.column(align=True)
-		column.prop(bpy.context.scene, "at_export_modular_mesh_name")
+		column.prop(bpy.context.scene, "at_modular_mesh_name", text='', placeholder='Base Name')
 		column.separator()
-
-		limits = bpy.context.scene.at_export_modular_mesh_limits		
+		
 		row = column.row(align=True)
-		row.prop(bpy.context.scene, "at_export_modular_mesh_limits")
-		row.separator()
-		row.operator('object.at_export_modular_mesh', text = "Set").mode='SET_LIMITS'		
+		row.label(text='Limits type:')
+		row.prop(context.scene, "at_modular_limits_type", text='')		
+		limits_type = context.scene.at_modular_limits_type		
+		column.separator()	
+		match (limits_type):
+			case 'X-Coords':							
+				row = column.row(align=True)
+				row.prop(context.scene, "at_modular_numeric_limits")
+				row.separator()
+				row.operator('object.at_export_modular_mesh', text="Set").mode='SET_LIMITS'
+			case 'Color':
+				obj = context.object
+				if obj is not None and obj.type == 'MESH':				
+					mesh = obj.data			
+					row = layout.row()
+					column = row.column()
+					column.template_list(
+						"MESH_UL_color_attributes",
+						"color_attributes",
+						mesh,
+						"color_attributes",
+						mesh.color_attributes,
+						"active_color_index",
+						rows=3,
+					)
 
+					column = row.column(align=True)
+					column.operator("geometry.color_attribute_add", icon='ADD', text="")
+					column.operator("geometry.color_attribute_remove", icon='REMOVE', text="")
+					column.separator()
+					column.menu("MESH_MT_color_attribute_context_menu", icon='DOWNARROW_HLT', text="")
+
+		column = layout.column(align=True)	
 		column.separator()
-		column.operator('object.at_export_modular_mesh', text = "Debug").mode='DEBUG'
-		column.operator('object.at_export_modular_mesh', text = "Export").mode='EXPORT'
+		column.operator('object.at_export_modular_mesh', text="Debug").mode='DEBUG'
+		column.operator('object.at_export_modular_mesh', text="Export").mode='EXPORT'
 
 class FixturesExportPanel(Panel):
 	bl_label = "Fixtures"
@@ -1584,7 +1626,8 @@ classes = (
 	ATWiki,
 	MaterialsEditPanel,
 	BodyUVs,
-	ModularExportPanel
+	ModularExportPanel,
+	BackupPanel
 )
 
 # Functions
